@@ -43,3 +43,7 @@ O navegador não acessa o banco diretamente. Cada solicitação ao backend exige
 ## Limitações da V1
 
 Sem sincronização com calendários externos, notificações push fechadas ou inteligência artificial generativa. Sugestões usam regras determinísticas; sessões reservadas são compromissos visíveis no calendário. Prazos e horários seguem a data/hora local fornecida pelo navegador do usuário.
+
+## Publicação automática
+
+Após vincular `dudinha756/nexo-app` ao projeto Vercel existente `nexo-rotina`, commits na branch de produção `main` podem disparar builds automáticos. Este ajuste de documentação também serve para verificar a integração GitHub → Vercel sem alterar o funcionamento do aplicativo.

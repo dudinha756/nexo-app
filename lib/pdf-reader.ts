@@ -4,7 +4,7 @@ import type {PdfWord} from './pdf-layout';
 export interface ExtractedPdf { pages:PdfWord[][]; pageCount:number; textCount:number }
 export async function extractPdfInBrowser(file:File):Promise<ExtractedPdf>{
  // PDF.js só é carregado quando o usuário escolhe um PDF.
- const pdfjs=await import('pdfjs-dist/build/pdf.mjs');
+ const pdfjs=await import('pdfjs-dist');
  pdfjs.GlobalWorkerOptions.workerSrc=new URL('pdfjs-dist/build/pdf.worker.min.mjs',import.meta.url).toString();
  const data=new Uint8Array(await file.arrayBuffer());
  const loading=pdfjs.getDocument({data,isEvalSupported:false,useSystemFonts:true});

@@ -1,6 +1,7 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
 import {interpretText,interpretRows,type DraftItem,type Intake} from "@/lib/intake";
+import {interpretPdfLayout} from "@/lib/pdf-layout";
 import {Mic,MicOff,FileSpreadsheet,Save,ArrowLeft,Trash2} from "lucide-react";
 import styles from "./style.module.css";
 
@@ -9,7 +10,7 @@ interface VoiceResult {results: ArrayLike<ArrayLike<{transcript:string}>>}
 interface VoiceEngine{lang:string;interimResults:boolean;continuous:boolean;onresult:((e:VoiceResult)=>void)|null;onend:(()=>void)|null;onerror:((e:{error:string})=>void)|null;start:()=>void;stop:()=>void}
 const nowDate=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
 export default function AssistantPage(){
- const [text,setText]=useState(''),[items,setItems]=useState<DraftItem[]>([]),[ignored,setIgnored]=useState<string[]>([]),[message,setMessage]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[listening,setListening]=useState(false),[existing,setExisting]=useState<Array<{title:string,day:string,start_time:string,end_time:string,repeat_weekly:boolean}>>([]);
+ const [fileLabel,setFileLabel]=useState(''),[text,setText]=useState(''),[items,setItems]=useState<DraftItem[]>([]),[ignored,setIgnored]=useState<string[]>([]),[message,setMessage]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[listening,setListening]=useState(false),[existing,setExisting]=useState<Array<{title:string,day:string,start_time:string,end_time:string,repeat_weekly:boolean}>>([]);
  const engine=useRef<VoiceEngine|null>(null);
  async function refresh(){try{const r=await fetch('/api/data',{cache:'no-store'});if(r.ok){const j=await r.json();setExisting(j.events||[])}else if(r.status===401)setError('Entre na sua conta para salvar a agenda.')}catch{}}
  useEffect(()=>{refresh();return()=>engine.current?.stop()},[]);
@@ -20,14 +21,46 @@ export default function AssistantPage(){
   if(!Recognizer){setError('Seu navegador não oferece reconhecimento de voz. Digite o lembrete ou tente o Chrome/Edge.');return}
   try{const r=new Recognizer();r.lang='pt-BR';r.interimResults=false;r.continuous=false;r.onresult=e=>{const result=Array.from(e.results).map(x=>x[0]?.transcript||'').join(' ');setText(result);parse(result)};r.onerror=e=>{setError('Falha no microfone: '+e.error);setListening(false)};r.onend=()=>setListening(false);engine.current=r;r.start();setListening(true)}catch(e){setError(String(e))}
  }
- async function upload(e:React.ChangeEvent<HTMLInputElement>){const f=e.target.files?.[0];if(!f)return;if(f.size>3*1024*1024){setError('Arquivo muito grande (limite 3 MB).');return}
-  setBusy(true);setError('');try{let rows:unknown[][]=[];
-   if(/\.xlsx$/i.test(f.name)){const mod=await import('read-excel-file/browser');rows=await mod.default(f) as unknown as unknown[][]}
-   else if(/\.csv$/i.test(f.name)){const s=await f.text();const first=s.split(/\r?\n/)[0]||'';const separator=first.split(';').length>first.split(',').length?';':',';rows=parseCsv(s,separator)}
-   else if(/\.tsv$/i.test(f.name))rows=(await f.text()).split(/\r?\n/).map(s=>s.split('\t'));
-   else if(/\.txt$/i.test(f.name))rows=(await f.text()).split(/\r?\n/).map(s=>[s]);
-   else throw Error('Selecione .xlsx, .csv, .tsv ou .txt.');consume(interpretRows(rows,nowDate()));
-  }catch(ex){setError('Não foi possível interpretar a planilha: '+String(ex))}finally{setBusy(false);e.target.value=''}
+ async function upload(e:React.ChangeEvent<HTMLInputElement>){
+  const f=e.target.files?.[0];if(!f)return;
+  const isPdf=/\.pdf$/i.test(f.name),maxBytes=(isPdf?8:3)*1024*1024;
+  if(f.size>maxBytes){setError(`Arquivo muito grande (limite ${isPdf?8:3} MB).`);e.target.value='';return}
+  setBusy(true);setFileLabel(f.name);setMessage('');setIgnored([]);setItems([]);setError('');
+  try{
+   if(isPdf){
+    setMessage('Lendo o texto e as tabelas do PDF no navegador...');
+    const {extractPdfInBrowser}=await import('@/lib/pdf-reader');
+    const pdf=await extractPdfInBrowser(f);
+    if(pdf.textCount<12)throw Error('Este PDF não tem texto selecionável. Se for uma foto ou digitalização, exporte uma versão com texto ou use Excel/CSV.');
+    const result:Intake={items:[],ignored:[]};
+    for(const [index,words] of pdf.pages.entries()){
+     const layout=interpretPdfLayout(words);
+     if(layout.tables.length){
+      const parsed=interpretRows(layout.tables,nowDate());
+      result.items.push(...parsed.items.map(x=>({...x,source:`PDF pág. ${index+1} · ${x.source}`})));
+      result.ignored.push(...parsed.ignored.map(x=>`PDF pág. ${index+1}: ${x}`));
+     }
+     for(const statement of layout.statements){
+      const parsed=interpretText(statement,nowDate());
+      result.items.push(...parsed.items.map(x=>({...x,source:`PDF pág. ${index+1} · ${x.source}`})));
+      // Cabeçalhos de PDF sem data não devem encher a lista de avisos.
+     }
+    }
+    if(!result.items.length)throw Error('Não identifiquei horários desse PDF. Prefira uma tabela Dia/Atividade/Início/Fim ou uma grade com dias da semana nas colunas.');
+    if(pdf.pageCount>1)result.ignored.unshift(`Foram analisadas ${pdf.pageCount} páginas do PDF.`);
+    consume(result);
+    setMessage(`${result.items.length} compromisso(s) encontrados em ${pdf.pageCount} página(s). Revise antes de salvar.`);
+   }else{
+    let rows:unknown[][]=[];
+    if(/\.xlsx$/i.test(f.name)){const mod=await import('read-excel-file/browser');rows=await mod.default(f) as unknown as unknown[][]}
+    else if(/\.csv$/i.test(f.name)){const s=await f.text();const first=s.split(/\r?\n/)[0]||'';const separator=first.split(';').length>first.split(',').length?';':',';rows=parseCsv(s,separator)}
+    else if(/\.tsv$/i.test(f.name))rows=(await f.text()).split(/\r?\n/).map(s=>s.split('\t'));
+    else if(/\.txt$/i.test(f.name))rows=(await f.text()).split(/\r?\n/).map(s=>[s]);
+    else throw Error('Selecione .pdf, .xlsx, .csv, .tsv ou .txt.');
+    consume(interpretRows(rows,nowDate()));
+   }
+  }catch(ex){setMessage('');setError('Não foi possível interpretar o arquivo: '+(ex instanceof Error?ex.message:String(ex)))}
+  finally{setBusy(false);e.target.value=''}
  }
  function set(id:string,key:keyof DraftItem,val:unknown){setItems(arr=>arr.map(x=>x.id===id?{...x,[key]:val}:x))}
  const duplicate=(d:DraftItem)=>existing.some(e=>e.title.toLowerCase()===d.title.toLowerCase()&&e.day===d.day&&e.start_time===(d.startTime||'09:00')&&e.end_time===(d.endTime||'09:15')&&!!e.repeat_weekly===d.repeatWeekly);
@@ -38,7 +71,7 @@ export default function AssistantPage(){
  }setBusy(false);setMessage(`${ok} salvo(s); ${skip} duplicado(s) ignorado(s); ${fail} com erro.`);if(ok){setItems([]);await refresh()}}
  return <main className={styles.shell}><div className={styles.wrap}><a href="/" className={styles.back}><ArrowLeft size={16}/> Voltar ao NEXO</a><span className={styles.eyebrow}>NEXO · ASSISTENTE DE ROTINA</span><h1>Organize falando.</h1><p className={styles.intro}>Importe seus horários, dite lembretes ou escreva compromissos. Revise tudo antes de incluir na agenda.</p>
  <div className={styles.grid}><section className={styles.card}><span className={styles.eyebrow}>01 · VOZ E TEXTO</span><h2>Fale. O NEXO interpreta.</h2><textarea placeholder="Ex.: Dia 3 de novembro tenho prova de Macroeconomia às 7 da noite" rows={4} value={text} onChange={e=>setText(e.target.value)}/><div className={styles.actions}><button onClick={record}>{listening?<MicOff size={17}/>:<Mic size={17}/>} {listening?'Parar gravação':'Gravar fala'}</button><button disabled={!text.trim()} onClick={()=>parse(text)}>Interpretar texto</button></div><small>O reconhecimento de voz depende do navegador e pode usar serviço do fornecedor. O NEXO não armazena áudio.</small></section>
- <section className={styles.card}><span className={styles.eyebrow}>02 · IMPORTAÇÃO</span><h2>Sua agenda em uma planilha.</h2><p>Arquivos Excel (.xlsx), CSV, TSV ou texto, de até 3 MB e 500 linhas. Prefira as colunas Dia, Atividade, Início e Fim.</p><label className={styles.upload}><FileSpreadsheet size={20}/> Escolher planilha <input type="file" accept=".xlsx,.csv,.tsv,.txt" onChange={upload}/></label><small>Leitura local no navegador, sem upload da planilha para terceiros.</small><div className={styles.examples}>{examples.map(v=><button key={v} onClick={()=>{setText(v);parse(v)}}>{v}</button>)}</div></section></div>
+ <section className={styles.card}><span className={styles.eyebrow}>02 · IMPORTAÇÃO</span><h2>Sua agenda em uma planilha ou PDF.</h2><p>Importe <strong>PDF (.pdf)</strong>, Excel (.xlsx), CSV ou TSV. PDF: até 8 MB e 25 páginas. Outros formatos: até 3 MB. Prefira tabelas com Dia, Atividade, Início e Fim ou grades semanais.</p><label className={styles.upload}><FileSpreadsheet size={20}/> {busy?"Analisando arquivo...":"Escolher PDF ou planilha"} <input type="file" accept=".pdf,application/pdf,.xlsx,.csv,.tsv,.txt" disabled={busy} onChange={upload}/></label>{fileLabel&&<small role="status">Último arquivo selecionado: {fileLabel}</small>}<small>Leitura do PDF no próprio navegador, sem envio do arquivo a terceiros. PDFs digitalizados sem texto ainda não têm OCR.</small><div className={styles.examples}>{examples.map(v=><button key={v} onClick={()=>{setText(v);parse(v)}}>{v}</button>)}</div></section></div>
  {error&&<p className={styles.error} role="alert">{error}</p>}{message&&<p className={styles.note} role="status">{message}</p>}
  {ignored.length>0&&<div className={styles.note}>{ignored.slice(0,7).join(' • ')}{ignored.length>7?' • ...':''}</div>}
  {items.length>0&&<section className={styles.card}><h2>Revise os compromissos</h2><p>Nada será salvo automaticamente. Horários ambíguos aparecem desmarcados para conferência.</p><div className={styles.list}>{items.map(d=><div className={styles.item} key={d.id}><input aria-label="Selecionar compromisso" type="checkbox" checked={d.selected} onChange={e=>set(d.id,'selected',e.target.checked)}/><div className={styles.fields}><label>Título<input value={d.title} onChange={e=>set(d.id,'title',e.target.value)} maxLength={180}/></label><label>Data<input type="date" value={d.day} onChange={e=>set(d.id,'day',e.target.value)}/></label><label>Início<input disabled={d.allDay} type="time" value={d.startTime||'09:00'} onChange={e=>set(d.id,'startTime',e.target.value)}/></label><label>Fim<input disabled={d.allDay} type="time" value={d.endTime||'10:00'} onChange={e=>set(d.id,'endTime',e.target.value)}/></label><label>Tipo<select value={d.kind==='task'?'task':d.category} onChange={e=>{set(d.id,'kind',e.target.value==='task'?'task':'event');set(d.id,'category',e.target.value==='task'?'personal':e.target.value)}}><option value="personal">Pessoal</option><option value="work">Trabalho</option><option value="class">Faculdade</option><option value="training">Treino</option><option value="study">Estudo</option><option value="task">Tarefa</option></select></label><div className={styles.flags}><label><input type="checkbox" checked={d.repeatWeekly} disabled={d.kind==='task'} onChange={e=>set(d.id,'repeatWeekly',e.target.checked)}/> Toda semana</label><label><input type="checkbox" checked={d.repeatYearly} disabled={d.kind==='task'} onChange={e=>set(d.id,'repeatYearly',e.target.checked)}/> Todo ano</label><label><input type="checkbox" checked={d.allDay} disabled={d.kind==='task'} onChange={e=>set(d.id,'allDay',e.target.checked)}/> Dia inteiro</label></div>{d.warning&&<p className={styles.warn}>{d.warning} Revise e marque o item para incluir.</p>}{duplicate(d)&&<p className={styles.warn}>Possível compromisso duplicado: será ignorado.</p>}</div><button aria-label="Remover item" className={styles.remove} onClick={()=>setItems(arr=>arr.filter(x=>x.id!==d.id))}><Trash2 size={16}/></button></div>)}</div><button disabled={busy||!items.some(x=>x.selected)} onClick={save}><Save size={16}/> {busy?'Salvando...':'Confirmar itens selecionados'}</button></section>}

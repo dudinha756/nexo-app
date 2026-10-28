@@ -44,6 +44,8 @@ O navegador não acessa o banco diretamente. Cada solicitação ao backend exige
 
 Sem sincronização com calendários externos, notificações push fechadas ou inteligência artificial generativa. Sugestões usam regras determinísticas; sessões reservadas são compromissos visíveis no calendário. Prazos e horários seguem a data/hora local fornecida pelo navegador do usuário.
 
-## Publicação automática
+## Importação de rotinas em PDF
 
-Após vincular `dudinha756/nexo-app` ao projeto Vercel existente `nexo-rotina`, commits na branch de produção `main` podem disparar builds automáticos. Este ajuste de documentação também serve para verificar a integração GitHub → Vercel sem alterar o funcionamento do aplicativo.
+Na página `/assistente`, o NEXO aceita `.pdf` (até 8 MB e 25 páginas), `.xlsx`, `.csv`, `.tsv` e `.txt`. O PDF é lido no **próprio navegador** com PDF.js; textos com posição de página são convertidos em linhas, tabelas com colunas `Dia | Atividade | Início | Fim` e grades com dias como colunas. O usuário sempre revisa os compromissos antes de confirmar.
+
+**Limites:** a extração funciona para PDFs que possuem texto selecionável. Fotografias e PDFs digitalizados sem texto não são processados (OCR não implementado). Estruturas complexas ou horários ambíguos devem ser revisados manualmente. O arquivo PDF em si não é enviado ao servidor do NEXO.

@@ -15,7 +15,8 @@
     "@neondatabase/auth": "latest",
     "@neondatabase/serverless": "^1.0.0",
     "lucide-react": "^0.468.0",
-    "read-excel-file": "^9.3.13"
+    "read-excel-file": "^9.3.13",
+    "pdfjs-dist": "6.4.299"
   },
   "devDependencies": {
     "typescript": "^5.8.0",

@@ -1,0 +1,8 @@
+"use client";
+import { FormEvent, useState } from "react";
+import { authClient } from "@/lib/auth-client";
+export default function ResetPassword() {
+ const [password,setPassword]=useState(""); const [message,setMessage]=useState(""); const [error,setError]=useState("");const [busy,setBusy]=useState(false);
+ async function submit(e:FormEvent){e.preventDefault();setBusy(true);setError("");try{const token=new URLSearchParams(window.location.search).get("token");if(!token)throw new Error("Link inválido ou expirado.");const r=await authClient.resetPassword({newPassword:password,token});if(r.error)throw Error(r.error.message||"Não foi possível atualizar a senha.");setMessage("Senha alterada. Agora você pode entrar no NEXO.");}catch(e){setError(e instanceof Error?e.message:"Não foi possível atualizar.");}finally{setBusy(false);}}
+ return <main className="auth-shell" style={{display:"grid",placeItems:"center",minHeight:"100vh",padding:20}}><div className="auth-panel-inner"><div className="eyebrow">NEXO · SUA CONTA</div><h1 style={{fontFamily:"Georgia,serif",fontWeight:400,fontSize:42}}>Uma nova senha.</h1><p style={{color:"#888"}}>Escolha uma senha segura para continuar.</p><form className="auth-form" onSubmit={submit}><label>Nova senha<input type="password" required minLength={8} value={password} onChange={e=>setPassword(e.target.value)} autoComplete="new-password"/></label>{error&&<p className="form-error">{error}</p>}{message&&<p className="form-success">{message}</p>}<button className="primary-button" disabled={busy}>{busy?"Salvando...":"Atualizar senha"}</button></form><a href="/" style={{display:"block",marginTop:25,color:"#80709b"}}>← Voltar ao início</a></div></main>
+}

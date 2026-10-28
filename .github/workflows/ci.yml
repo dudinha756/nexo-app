@@ -1,0 +1,23 @@
+name: NEXO CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  unit-tests-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install
+      - name: Testes de calendário e agendamento
+        run: npm test
+      - name: Compilação Next.js
+        run: npm run build
+        env:
+          NEON_AUTH_BASE_URL: https://example.neonauth.example.com/nexo/auth
+          NEON_AUTH_COOKIE_SECRET: placeholder-for-ci-not-used-in-real-sessions-987654
+          DATABASE_URL: postgresql://fake:fake@localhost:5432/nexo

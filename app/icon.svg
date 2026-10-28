@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 512 512" role="img" aria-label="Ícone NEXO">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fffbfa"/><stop offset="0.54" stop-color="#fdf6f9"/><stop offset="1" stop-color="#e5d6ed"/></linearGradient>
+  <radialGradient id="blush" cx="0" cy="0" r="1" gradientTransform="translate(66 76) rotate(35) scale(325 310)"><stop stop-color="#ffe7e6" stop-opacity="0.8"/><stop offset="1" stop-color="#ffe7e6" stop-opacity="0"/></radialGradient>
+  <linearGradient id="n" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#eca3b8"/><stop offset="0.29" stop-color="#dd98bb"/><stop offset="0.65" stop-color="#a97fc5"/><stop offset="1" stop-color="#725cac"/></linearGradient>
+  <linearGradient id="spark" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d595bd"/><stop offset="1" stop-color="#725aac"/></linearGradient>
+  <filter id="soft" x="-35%" y="-35%" width="170%" height="170%"><feGaussianBlur stdDeviation="9"/></filter>
+</defs>
+<rect x="2" y="2" width="508" height="508" rx="114" fill="url(#bg)"/>
+<rect x="2" y="2" width="508" height="508" rx="114" fill="url(#blush)"/>
+<path d="M146 364 C146 277 140 218 149 203 C158 178 186 171 207 186 C253 218 290 323 335 358 C352 373 373 373 386 358 C405 333 391 288 377 254" fill="none" stroke="#aa83ba" stroke-opacity="0.17" stroke-width="41" stroke-linecap="round" filter="url(#soft)" transform="translate(0 11)"/>
+<path d="M146 364 C146 277 140 218 149 203 C158 178 186 171 207 186 C253 218 290 323 335 358 C352 373 373 373 386 358 C405 333 391 288 377 254" fill="none" stroke="url(#n)" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M377 125 Q384 164 405 172 Q384 181 377 216 Q371 181 350 172 Q370 163 377 125 Z" fill="url(#spark)"/>
+<path d="M425 237 Q428 251 437 255 Q428 260 425 273 Q421 260 413 255 Q422 251 425 237 Z" fill="#dfb0c9" opacity=".8"/>
+<rect x="2.5" y="2.5" width="507" height="507" rx="114" fill="none" stroke="#f8eef7" stroke-width="5"/>
+</svg>

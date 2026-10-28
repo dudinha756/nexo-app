@@ -7,7 +7,7 @@ export async function extractPdfInBrowser(file:File):Promise<ExtractedPdf>{
  const pdfjs=await import('pdfjs-dist');
  pdfjs.GlobalWorkerOptions.workerSrc=new URL('pdfjs-dist/build/pdf.worker.min.mjs',import.meta.url).toString();
  const data=new Uint8Array(await file.arrayBuffer());
- const loading=pdfjs.getDocument({data,isEvalSupported:false,useSystemFonts:true});
+ const loading=pdfjs.getDocument({data,useSystemFonts:true});
  try{
   const document=await loading.promise;
   if(document.numPages>25)throw new Error(`PDF com ${document.numPages} páginas. Envie no máximo 25 páginas por importação.`);
@@ -20,7 +20,6 @@ export async function extractPdfInBrowser(file:File):Promise<ExtractedPdf>{
    }
    pages.push(words);
   }
-  await document.destroy();
   return {pages,pageCount:pages.length,textCount};
  }finally{await loading.destroy()}
 }

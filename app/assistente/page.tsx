@@ -22,7 +22,7 @@ export default function AssistantPage(){
  }
  async function upload(e:React.ChangeEvent<HTMLInputElement>){const f=e.target.files?.[0];if(!f)return;if(f.size>3*1024*1024){setError('Arquivo muito grande (limite 3 MB).');return}
   setBusy(true);setError('');try{let rows:unknown[][]=[];
-   if(/\.xlsx$/i.test(f.name)){const mod=await import('read-excel-file/browser');rows=await mod.default(f)}
+   if(/\.xlsx$/i.test(f.name)){const mod=await import('read-excel-file/browser');rows=await mod.default(f) as unknown as unknown[][]}
    else if(/\.csv$/i.test(f.name)){const s=await f.text();const first=s.split(/\r?\n/)[0]||'';const separator=first.split(';').length>first.split(',').length?';':',';rows=parseCsv(s,separator)}
    else if(/\.tsv$/i.test(f.name))rows=(await f.text()).split(/\r?\n/).map(s=>s.split('\t'));
    else if(/\.txt$/i.test(f.name))rows=(await f.text()).split(/\r?\n/).map(s=>[s]);

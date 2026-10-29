@@ -35,17 +35,24 @@ export default function LifeReminders(){
    }catch{return}
    const date=isoToday(),now=new Date(),nowMin=now.getHours()*60+now.getMinutes();
    for(const e of events){
-    if(e.all_day||!occurs(e,date))continue;
     const cat=e.custom_category_id?"custom:"+e.custom_category_id:e.category;
     if(!prefs.categories.includes(cat))continue;
-    const starts=minutes(e.start_time);
-    if(starts<nowMin||starts-nowMin>prefs.lead)continue;
+    let body="";
+    if(e.all_day){
+     // Avoid inventing a clock time for birthdays and other all-day commitments.
+     if(!occurs(e,date)||nowMin<480||nowMin>1200)continue;
+     body=e.title+" é hoje. Confira seus planos.";
+    }else{
+     if(!occurs(e,date))continue;
+     const starts=minutes(e.start_time);
+     if(starts<nowMin||starts-nowMin>prefs.lead)continue;
+     body=e.title+" começa às "+e.start_time;
+    }
     const marker="nexo:sent:"+userId+":"+date+":"+e.id;
     if(localStorage.getItem(marker))continue;
-    // Save the key before attempting to notify to avoid duplicates across open tabs.
     try{
      localStorage.setItem(marker,String(Date.now()));
-     const n=new Notification("NEXO · Compromisso próximo",{body:e.title+" começa às "+e.start_time,icon:"/icon.svg",tag:marker});
+     const n=new Notification("NEXO · "+(e.all_day?"Data importante":"Compromisso próximo"),{body,icon:"/icon.svg",tag:marker});
      n.onclick=()=>{window.focus();window.location.href="/vida";n.close()};
     }catch{localStorage.removeItem(marker)}
    }

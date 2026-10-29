@@ -55,7 +55,7 @@ function parseNaturalDate(input:string,today:string):string|null{
   if(/\bamanha\b/.test(s))return addDays(today,1);
   if(/\bhoje\b/.test(s))return today;
   const m=s.match(/\bdia\s+(primeiro|1[º°]?|\d{1,2})(?:\s+de\s+([a-zç]+|\d{1,2}))?(?:\s+de\s+(\d{4}))?/)||s.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?/);
-  if(!m)return null;
+  if(!m){ const weekday=weekdayIndex(s); return weekday>=0 ? nextWeekday(weekday,today) : null; }
   const day=m[1]==='primeiro'?1:parseInt(m[1]);
   let mo=m[2]?months.indexOf(m[2])+1 || parseInt(m[2]):b.getUTCMonth()+1;
   if(!mo||mo>12)return null;
@@ -66,7 +66,21 @@ function parseNaturalDate(input:string,today:string):string|null{
   if (!m[2] && !m[3] && candidate()<today){mo++;if(mo>12){mo=1;year++;}}
   const isoDay=candidate();return validDay(isoDay)?isoDay:null;
 }
-function getCategory(text:string){const s=unaccent(text);return /trabalh|expediente|plantao/.test(s)?'work':/faculdade|aula|curso|prova|seminario/.test(s)?'class':/treino|academia|corrida|jiu|muay/.test(s)?'training':'personal';}
+/** Classify commitments across all parts of life, not only academic activities. */
+export function getCategory(text:string){
+ const s=unaccent(text);
+ if(/aniversario|niver|parabens/.test(s))return 'birthday';
+ if(/consulta|medico|dentista|exame|psicolog|terapia|vacina|hospital/.test(s))return 'health';
+ if(/jantar|almoco|restaurante|brunch|cafe da manha|pizzaria/.test(s))return 'dining';
+ if(/amig[oa]s?|encontro com a turma|happy hour|reuniao de amigos/.test(s))return 'friends';
+ if(/familia|mae|pai|irma[oa]|avos?|sobrinh[oa]|filh[oa]/.test(s))return 'family';
+ if(/viagem|ferias|cinema|show|passeio|festa|lazer|praia|teatro|festival/.test(s))return 'leisure';
+ if(/trabalh|expediente|plantao|reuniao profissional|cliente|fornecedor|escritorio/.test(s))return 'work';
+ if(/treino|academia|corrida|jiu|muay|musculacao|pilates|ciclismo|beach tennis|natacao|yoga/.test(s))return 'training';
+ if(/faculdade|aula|curso|prova|seminario/.test(s))return 'class';
+ if(/estud|revis|leitura|pesquisa|artigo|redacao|exercicio academico/.test(s))return 'study';
+ return 'personal';
+}
 function cleanTitle(s:string) {
  return s.replace(/^(?:me lembra(?:r)?(?: de)?|lembrete(?: de)?|tenho|tem|preciso|anota(?:r)?|adiciona(?:r)?|coloca(?:r)?)(?:\s+que)?\s*/i,'')
   .replace(/\b(?:no|na|dia)\s+(?:primeiro|\d{1,2})(?:\s+de\s+\w+)?(?:\s+de\s+\d{4})?\b/ig,'')
@@ -87,11 +101,11 @@ export function interpretText(text:string,today=iso(new Date())):Intake{
     }
     const day=parseNaturalDate(raw,today);
     if(!day){ignored.push(`Não encontrei uma data em: “${raw.slice(0,120)}”.`);continue;}
-    const isTask=/\b(entregar|finalizar|enviar|submeter|preparar|estudar para)\b/.test(norm);
+    const isTask=/\b(entregar|finalizar|enviar|submeter|preparar|estudar para|comprar|pagar|resolver|ligar para|organizar|separar documentos)\b/.test(norm);
     const birthday=/\b(aniversario)\b/.test(norm);
     const mentionsTime=/\b(?:as|às)\s*\d{1,2}(?:\s*(?:h|:|horas?)\d{0,2})?/.test(norm);
-    let startTime='',endTime='',warn='',allDay=birthday||!mentionsTime;
-    if(mentionsTime&&!birthday){
+    let startTime='',endTime='',warn='',allDay=!mentionsTime;
+    if(mentionsTime){
       const mt=norm.match(/\b(?:as|às)\s*(\d{1,2})(?:\s*(?:h|:)\s*(\d{1,2}))?(?:\s*(?:h|horas?))?(?:\s*da\s*(manha|tarde|noite))?/);
       if(mt){const hour=Number(mt[1]);let h=hour;const min=Number(mt[2]||0),pr=mt[3];
        if(pr==='noite'||pr==='tarde'){if(h<12)h+=12;}
@@ -100,7 +114,7 @@ export function interpretText(text:string,today=iso(new Date())):Intake{
       }
     }
     const title=cleanTitle(raw);
-    items.push(item({kind:isTask?'task':'event',title:titleCase(title),day,startTime,endTime,category:cat,allDay,repeatYearly:birthday,durationMinutes:60,source:raw,warning:warn,selected:!warn}));
+    items.push(item({kind:isTask?'task':'event',title:titleCase(title),day,startTime,endTime,category:cat,allDay,repeatYearly:birthday&&!/festa|jantar|comemoracao|celebracao/.test(norm),durationMinutes:60,source:raw,warning:warn,selected:!warn}));
   }
   return {items,ignored};
 }
@@ -118,6 +132,7 @@ export function interpretRows(rows:unknown[][],today=iso(new Date())):Intake {
    if(['fim','horasaida','horadefim','horafim','saida','ate'].includes(k))found.end=j;
    if(['horario','horarios','periodo'].includes(k))found.range=j;
    if(['repetir','recorrencia','frequencia'].includes(k))found.repeat=j;
+   if(['categoria','tipo','area','ambito'].includes(k))found.category=j;
  });if(found.day!==undefined&& (found.title!==undefined||found.start!==undefined||found.range!==undefined)){hi=i;cols=found;break;}}
  if(hi<0){for(const [index,row] of rows.entries()){const line=row.map(text).filter(Boolean).join(' ');if(!line)continue;const parsed=interpretText(line,today);all.push(...parsed.items);ignored.push(...parsed.ignored.map(msg=>`Linha ${index+1}: ${msg}`));}return {items:all,ignored};}
  for(let i=hi+1;i<rows.length;i++){
@@ -130,8 +145,8 @@ export function interpretRows(rows:unknown[][],today=iso(new Date())):Intake {
   const start=range?.startTime || parseTime(row[cols.start]);const end=range?.endTime||parseTime(row[cols.end]);
   if(!start||!end||start>=end){ignored.push(`Linha ${i+1}: horário ausente ou inválido (${title}).`);continue;}
   const repeat=cols.repeat===undefined?true:/^(sim|s|semanal|toda|todos|true|1)$/i.test(text(row[cols.repeat]));
-  if(days.length){for(const dow of days)all.push(item({title,day:nextWeekday(dow,today),startTime:start,endTime:end,repeatWeekly:repeat,category:getCategory(title),source:`Linha ${i+1}`}));}
-  else if(date){all.push(item({title,day:date,startTime:start,endTime:end,category:getCategory(title),source:`Linha ${i+1}`}));}
+  if(days.length){for(const dow of days)all.push(item({title,day:nextWeekday(dow,today),startTime:start,endTime:end,repeatWeekly:repeat,category:getCategory(cols.category===undefined?title:text(row[cols.category])),source:`Linha ${i+1}`}));}
+  else if(date){all.push(item({title,day:date,startTime:start,endTime:end,category:getCategory(cols.category===undefined?title:text(row[cols.category])),source:`Linha ${i+1}`}));}
   else ignored.push(`Linha ${i+1}: dia não identificado (${title}).`);
  }
  return {items:all,ignored};

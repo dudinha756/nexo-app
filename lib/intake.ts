@@ -103,6 +103,7 @@ export function interpretText(text:string,today=iso(new Date())):Intake{
     if(!day){ignored.push(`Não encontrei uma data em: “${raw.slice(0,120)}”.`);continue;}
     const isTask=/\b(entregar|finalizar|enviar|submeter|preparar|estudar para|comprar|pagar|resolver|ligar para|organizar|separar documentos)\b/.test(norm);
     const birthday=/\b(aniversario)\b/.test(norm);
+    const explicitWeekly=days.length>0 && /\b(toda|todo|todas|todos|semanalmente|a cada semana)\b/.test(norm);
     const mentionsTime=/\b(?:as|às)\s*\d{1,2}(?:\s*(?:h|:|horas?)\d{0,2})?/.test(norm);
     let startTime='',endTime='',warn='',allDay=!mentionsTime;
     if(mentionsTime){
@@ -114,7 +115,7 @@ export function interpretText(text:string,today=iso(new Date())):Intake{
       }
     }
     const title=cleanTitle(raw);
-    items.push(item({kind:isTask?'task':'event',title:titleCase(title),day,startTime,endTime,category:cat,allDay,repeatYearly:birthday&&!/festa|jantar|comemoracao|celebracao/.test(norm),durationMinutes:60,source:raw,warning:warn,selected:!warn}));
+    items.push(item({kind:isTask?'task':'event',title:titleCase(title),day,startTime,endTime,category:cat,allDay,repeatWeekly:explicitWeekly,repeatYearly:birthday&&!/festa|jantar|comemoracao|celebracao/.test(norm),durationMinutes:60,source:raw,warning:warn,selected:!warn}));
   }
   return {items,ignored};
 }

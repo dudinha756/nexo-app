@@ -12,7 +12,7 @@ type EventForm={title:string;day:string;startTime:string;endTime:string;category
 type TaskForm={title:string;dueDate:string;durationMinutes:number;priority:"low"|"medium"|"high";category:string;notes:string};
 type ReminderSettings={enabled:boolean;lead:number;categories:string[]};
 const today=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-")};
-const dailyDate=d=>new Date(d+"T12:00:00Z").toLocaleDateString("pt-BR",{day:"2-digit",month:"short",timeZone:"UTC"});
+const dailyDate=(d:string)=>new Date(d+"T12:00:00Z").toLocaleDateString("pt-BR",{day:"2-digit",month:"short",timeZone:"UTC"});
 const eventDefaults=():EventForm=>({title:"",day:today(),startTime:"09:00",endTime:"10:00",category:"personal",repeatWeekly:false,repeatYearly:false,allDay:false});
 const taskDefaults=():TaskForm=>({title:"",dueDate:today(),durationMinutes:60,priority:"medium",category:"personal",notes:""});
 const reminderDefaults:ReminderSettings={enabled:false,lead:30,categories:DEFAULT_CATEGORIES.map(c=>c.id)};
@@ -58,8 +58,8 @@ export default function LifePage(){
   ...DEFAULT_CATEGORIES.map(c=>({key:c.id,label:c.label,color:c.color,icon:c.icon})),
   ...data.categories.map(c=>({key:"custom:"+c.id,label:c.name,color:c.color,icon:c.icon}))
  ],[data.categories]);
- const nameFor=k=>allCats.find(c=>c.key===k)?.label||"Pessoal";
- const colorFor=k=>allCats.find(c=>c.key===k)?.color||"#9585a8";
+ const nameFor=(k:string)=>allCats.find(c=>c.key===k)?.label||"Pessoal";
+ const colorFor=(k:string)=>allCats.find(c=>c.key===k)?.color||"#9585a8";
  const dayEvents=useMemo(()=>data.events.filter(e=>occurs(e,selectedDate)&&(filter==="all"||catKey(e)===filter)).sort((a,b)=>a.start_time.localeCompare(b.start_time)),[data.events,selectedDate,filter]);
  const pending=useMemo(()=>data.tasks.filter(t=>t.status!=="done"&&(filter==="all"||catKey(t)===filter)).sort((a,b)=>a.due_date.localeCompare(b.due_date)),[data.tasks,filter]);
  const weekDates=useMemo(()=>Array.from({length:7},(_,i)=>addDays(week,i)),[week]);

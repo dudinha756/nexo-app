@@ -136,22 +136,7 @@ export default function LifePage(){
   localStorage.setItem("nexo:life-reminders:"+userId,JSON.stringify(prefs));
   setSuccess(prefs.enabled?"Avisos configurados para este navegador.":"Avisos desativados.");
  }
- useEffect(()=>{
-  if(!userId||!prefsReady||!prefs.enabled||!data.events.length)return;
-  const tick=()=>{
-   if(document.visibilityState!=="visible"||!("Notification" in window)||Notification.permission!=="granted")return;
-   const date=today(),now=new Date(),curr=now.getHours()*60+now.getMinutes();
-   for(const e of data.events){
-    if(e.all_day||!occurs(e,date)||!prefs.categories.includes(catKey(e)))continue;
-    const until=minutes(e.start_time)-curr;
-    if(until<0||until>prefs.lead)continue;
-    const key="nexo:alert:"+userId+":"+date+":"+e.id;
-    if(sessionStorage.getItem(key))continue;
-    try{new Notification("NEXO · Compromisso próximo",{body:e.title+" começa às "+e.start_time,icon:"/icon.svg",tag:key});sessionStorage.setItem(key,"1")}catch{}
-   }
-  };
-  tick();const handle=setInterval(tick,60000);return()=>clearInterval(handle);
- },[data.events,prefs,userId,prefsReady]);
+
  return <main className={st.shell}><div className={st.wrap}>
   <a href="/" className={st.back}><ArrowLeft size={16}/> Voltar ao NEXO</a>
   <header className={st.heading}><div><span className={st.tag}>NEXO · TODAS AS ÁREAS DA VIDA</span><h1>Minha vida em sintonia.</h1><p className={st.muted}>Trabalho, treinos, estudo, família, encontros e lazer. Tudo em uma agenda, com prioridades escolhidas por você.</p></div><div className={st.actions}><button className={st.btn} onClick={()=>startEvent()}><Plus size={16}/> Compromisso</button><button className={st.btn+" "+st.secondary} onClick={startTask}><Plus size={16}/> Tarefa</button></div></header>

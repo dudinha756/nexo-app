@@ -1,4 +1,4 @@
-import { addDays, clock, minutes, occurs, overlaps, validClock, validDay, type EventRow } from "./schedule";
+import { addDays, clock, minutes, occurs, overlaps, validClock, validDay, type EventRow } from "./schedule.ts";
 
 /** Pure, opt-in suggestions: the caller decides whether any change is saved. */
 export function alternativeTimes(

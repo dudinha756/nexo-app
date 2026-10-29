@@ -1,5 +1,5 @@
 /** Leitura local e interpretador de rotina em português. Sem envio de áudio/planilhas a terceiros. */
-import { addDays, validDay } from './schedule';
+import { addDays, validDay } from './schedule.ts';
 
 export type DraftItem = {
   id: string; kind: 'event' | 'task'; title: string; day: string;

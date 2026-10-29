@@ -2,6 +2,7 @@ import {NextRequest,NextResponse} from 'next/server';
 import {auth} from '@/lib/auth-server';
 import {sql} from '@/lib/database';
 import {validDay} from '@/lib/schedule';
+import {isDefaultCategory} from '@/lib/categories';
 export const runtime='nodejs';
 const failure=(message:string,status=400)=>NextResponse.json({error:message},{status});
 const validTime=(v:unknown)=>typeof v==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(v);
@@ -21,8 +22,11 @@ export async function POST(req:NextRequest){try{
  if(b.action==='acknowledge'){const p=await getPrefs(u);const date=localDate(String(p.timezone));const rows=await sql`INSERT INTO nexo_briefing_preferences(user_id,last_acknowledged_date) VALUES(${u},${date}) ON CONFLICT(user_id) DO UPDATE SET last_acknowledged_date=EXCLUDED.last_acknowledged_date,updated_at=now() RETURNING last_acknowledged_date::text`;return NextResponse.json({ok:true,date:rows[0].last_acknowledged_date});}
  if(b.action==='editTask'){
   const id=String(b.id||''),title=String(b.title||'').trim(),notes=String(b.notes||'').trim(),duration=Number(b.durationMinutes);
+  const category=String(b.category||'personal'),customCategoryId=b.customCategoryId?String(b.customCategoryId):null;
+  if(!isDefaultCategory(category)||(customCategoryId&&category!=='other'))return failure('Categoria inválida.');
+  if(customCategoryId){const permitted=await sql`SELECT id FROM nexo_categories WHERE id=${customCategoryId} AND user_id=${u}`;if(!permitted.length)return failure('Categoria personalizada não encontrada.',404);}
   if(!/^[a-f0-9-]{36}$/i.test(id)||!title||title.length>180||notes.length>1000||!validDay(b.dueDate)||!Number.isInteger(duration)||duration<15||duration>600||!['low','medium','high'].includes(b.priority))return failure('Revise os dados da tarefa.');
-  const rows=await sql`UPDATE nexo_tasks SET title=${title},notes=${notes},due_date=${b.dueDate},duration_minutes=${duration},priority=${b.priority} WHERE user_id=${u} AND id=${id} RETURNING id`;
+  const rows=await sql`UPDATE nexo_tasks SET title=${title},notes=${notes},due_date=${b.dueDate},duration_minutes=${duration},priority=${b.priority},category=${category},custom_category_id=${customCategoryId} WHERE user_id=${u} AND id=${id} RETURNING id`;
   return rows.length?NextResponse.json({ok:true}):failure('Tarefa não encontrada.',404);
  }
  return failure('Ação não reconhecida.');

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import DailyBriefingPrompt from "@/components/DailyBriefingPrompt";
+import LifeReminders from "@/components/LifeReminders";
 
 export const metadata: Metadata = {
   title: "NEXO | Seu tempo faz sentido",
@@ -11,6 +12,6 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <html lang="pt-BR"><body>{children}
       <div className="nexo-quick-links"><a href="/vida">✳ Minha vida</a><a href="/resumo">☀ Meu resumo diário</a><a href="/assistente">✳ Assistente NEXO</a></div>
-      <DailyBriefingPrompt />
+      <DailyBriefingPrompt /><LifeReminders />
     </body></html>;
 }

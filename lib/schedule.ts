@@ -1,10 +1,11 @@
 export type EventRow = {
   id: string; title: string; day: string; start_time: string; end_time: string;
-  category: string; repeat_weekly: boolean; repeat_yearly?: boolean; all_day?: boolean; task_id: string | null;
+  category: string; custom_category_id?: string | null; repeat_weekly: boolean; repeat_yearly?: boolean; all_day?: boolean; task_id: string | null;
 };
 export type TaskRow = {
   id: string; title: string; notes: string; due_date: string;
   duration_minutes: number; priority: string; status: string; subject_id: string | null;
+  category?: string | null; custom_category_id?: string | null;
 };
 export type SubjectRow = { id: string; name: string; color: string };
 
@@ -35,9 +36,30 @@ export function validClock(v: unknown): v is string {
   return typeof v === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
 }
 export function overlaps(a: number, b: number, c: number, d: number) { return a < d && b > c; }
+export type ConflictWarning = { eventId: string; title: string; day: string; start_time: string; end_time: string };
+/** Preview collisions without changing the user's calendar. Checks 400 days for recurring events. */
+export function potentialEventConflicts(candidate: EventRow, existing: EventRow[]): ConflictWarning[] {
+  if (candidate.all_day) return [];
+  const horizon = candidate.repeat_weekly || candidate.repeat_yearly ? 400 : 1;
+  const warnings: ConflictWarning[] = [];
+  for (const e of existing) {
+    if (e.id === candidate.id || e.all_day ||
+        !overlaps(minutes(candidate.start_time), minutes(candidate.end_time), minutes(e.start_time), minutes(e.end_time))) continue;
+    for (let offset = 0; offset < horizon; offset++) {
+      const day = addDays(candidate.day, offset);
+      if (occurs(candidate, day) && occurs(e, day)) {
+        warnings.push({ eventId: e.id, title: e.title, day, start_time: e.start_time, end_time: e.end_time });
+        break;
+      }
+    }
+    if (warnings.length >= 5) break;
+  }
+  return warnings;
+}
+
 export function suggestedSlots(task: TaskRow, events: EventRow[], today: string, timeNow: string) {
   if (task.status === "done" || task.due_date < today) return [];
-  const booked = events.filter(e => e.task_id === task.id && !e.repeat_weekly)
+  const booked = events.filter(e => e.task_id === task.id && !e.repeat_weekly && !e.repeat_yearly && !e.all_day)
     .reduce((sum, e) => sum + minutes(e.end_time) - minutes(e.start_time), 0);
   let remaining = Math.max(0, task.duration_minutes - booked);
   if (remaining < 15) return [];

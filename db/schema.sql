@@ -52,3 +52,7 @@ CREATE TABLE IF NOT EXISTS nexo_briefing_preferences (
   last_acknowledged_date date,
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- Execute a migração idempotente abaixo para adicionar categorias a bases existentes.
+-- A tabela de categorias personalizadas e as colunas opcionais são criadas pelo mesmo script.
+-- Ver db/migrations/20261029_categories.sql (aplicar após a estrutura inicial).

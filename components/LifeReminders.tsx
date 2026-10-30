@@ -7,21 +7,25 @@ const isoToday=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth
 /** An optional in-browser reminder. No service worker, background push or server monitoring. */
 export default function LifeReminders(){
  useEffect(()=>{
-  let alive=true,userId="",events:EventRow[]=[];let lastRefresh=0;let inProgress=false;
-  async function refresh(){
-   if(!alive||inProgress)return;
+  let alive=true,userId="",events:EventRow[]=[];let inProgress=false;
+  // Recheck the session before every notification cycle: never reuse another
+  // account's events after sign-out, account switch or a failed data request.
+  async function refresh():Promise<boolean>{
+   if(!alive||inProgress)return false;
    inProgress=true;
    try{
     const session=await authClient.getSession();
+    if(!alive)return false;
     const current=session.data?.user?.id||"";
-    if(!current){userId="";events=[];return}
-    userId=current;
+    if(current!==userId){events=[];userId=current}
+    if(!current)return false;
     const r=await fetch("/api/data",{cache:"no-store"});
-    if(!r.ok)return;
+    if(!r.ok){events=[];return false}
     const j=await r.json();
-    if(!alive)return;
-    events=Array.isArray(j.events)?j.events:[];lastRefresh=Date.now();
-   }catch{}finally{inProgress=false}
+    if(!alive)return false;
+    events=Array.isArray(j.events)?j.events:[];
+    return true;
+   }catch{events=[];return false}finally{inProgress=false}
   }
   function tick(){
    if(!alive||document.visibilityState!=="visible"||!userId)return;
@@ -57,11 +61,12 @@ export default function LifeReminders(){
     }catch{localStorage.removeItem(marker)}
    }
   }
-  const timer=setInterval(()=>{if(Date.now()-lastRefresh>300000)refresh().then(tick);else tick()},60000);
-  const focused=()=>{if(document.visibilityState==="visible")refresh().then(tick)};
+  const check=()=>{refresh().then(validSession=>{if(validSession)tick()})};
+  const timer=setInterval(()=>{if(document.visibilityState==="visible")check()},60000);
+  const focused=()=>{if(document.visibilityState==="visible")check()};
   document.addEventListener("visibilitychange",focused);
   window.addEventListener("focus",focused);
-  refresh().then(tick);
+  check();
   return ()=>{alive=false;clearInterval(timer);document.removeEventListener("visibilitychange",focused);window.removeEventListener("focus",focused)};
  },[]);
  return null;

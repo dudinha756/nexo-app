@@ -37,16 +37,21 @@ export function validClock(v: unknown): v is string {
 }
 export function overlaps(a: number, b: number, c: number, d: number) { return a < d && b > c; }
 export type ConflictWarning = { eventId: string; title: string; day: string; start_time: string; end_time: string };
-/** Preview collisions without changing the user's calendar. Checks 400 days for recurring events. */
-export function potentialEventConflicts(candidate: EventRow, existing: EventRow[]): ConflictWarning[] {
+/** Preview collisions without changing the user's calendar. Checks the next 400 days
+ * for recurring events, even when their original start date is years in the past. */
+export function potentialEventConflicts(
+  candidate: EventRow, existing: EventRow[], referenceDay = dateStr(new Date()),
+): ConflictWarning[] {
   if (candidate.all_day) return [];
-  const horizon = candidate.repeat_weekly || candidate.repeat_yearly ? 400 : 1;
+  const recurring = candidate.repeat_weekly || candidate.repeat_yearly;
+  const horizon = recurring ? 400 : 1;
+  const firstDay = recurring && candidate.day < referenceDay ? referenceDay : candidate.day;
   const warnings: ConflictWarning[] = [];
   for (const e of existing) {
     if (e.id === candidate.id || e.all_day ||
         !overlaps(minutes(candidate.start_time), minutes(candidate.end_time), minutes(e.start_time), minutes(e.end_time))) continue;
     for (let offset = 0; offset < horizon; offset++) {
-      const day = addDays(candidate.day, offset);
+      const day = addDays(firstDay, offset);
       if (occurs(candidate, day) && occurs(e, day)) {
         warnings.push({ eventId: e.id, title: e.title, day, start_time: e.start_time, end_time: e.end_time });
         break;

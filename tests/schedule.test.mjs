@@ -60,3 +60,17 @@ test('ignora colisões inexistentes e eventos anuais de dia inteiro',()=>{
  const timed={...birthday,all_day:false,start_time:'09:30',end_time:'10:00'};
  assert.equal(potentialEventConflicts(candidate,[timed]).length,1);
 });
+
+test('detecta colisão futura ao editar série semanal iniciada anos antes',()=>{
+ const recurring={...event('2022-10-28','18:00','19:00',true),id:'old-gym',category:'training'};
+ const dinner={...event('2026-11-06','18:30','20:00'),id:'dinner',category:'dining'};
+ const collisions=potentialEventConflicts(recurring,[dinner],'2026-10-30');
+ assert.equal(collisions.length,1);
+ assert.equal(collisions[0].day,'2026-11-06');
+});
+test('repetição anual antiga verifica próxima ocorrência e ignora dia inteiro',()=>{
+ const annual={...event('2020-11-10','19:00','20:00'),id:'anniversary',repeat_yearly:true,category:'family'};
+ const dinner={...event('2026-11-10','19:30','21:00'),id:'dinner',category:'dining'};
+ assert.equal(potentialEventConflicts(annual,[dinner],'2026-10-30')[0]?.day,'2026-11-10');
+ assert.deepEqual(potentialEventConflicts({...annual,all_day:true},[dinner],'2026-10-30'),[]);
+});

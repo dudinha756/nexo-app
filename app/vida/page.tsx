@@ -50,6 +50,9 @@ export default function LifePage(){
  },[]);
  useEffect(()=>{read();authClient.getSession().then(r=>setUserId(r.data?.user?.id||"")).catch(()=>{})},[read]);
  useEffect(()=>{
+  // Preferences belong to the signed-in user, not the previous account.
+  setPrefs({...reminderDefaults,categories:[...reminderDefaults.categories]});
+  setPrefsReady(false);
   if(!userId)return;
   try{
    const raw=localStorage.getItem("nexo:life-reminders:"+userId);
@@ -170,8 +173,8 @@ export default function LifePage(){
   </section>}
   <div className={st.grid}><div>
    <section className={st.card}><div className={st.toolbar}><div><span className={st.tag}>AGENDA INTEGRADA</span><h2>Seus compromissos</h2></div><div className={st.dateNav}><button title="Semana anterior" onClick={()=>{const w=addDays(week,-7);setWeek(w);setSelectedDate(w)}}><ArrowLeft size={15}/></button><b>{dailyDate(week)} – {dailyDate(addDays(week,6))}</b><button title="Próxima semana" onClick={()=>{const w=addDays(week,7);setWeek(w);setSelectedDate(w)}}><ArrowRight size={15}/></button></div></div>
-    <div className={st.daygrid}>{weekDates.map((d,i)=><button key={d} className={st.day+" "+(selectedDate===d?st.selected:"")} onClick={()=>setSelectedDate(d)}><small>{weekLabels[i]}</small><strong>{Number(d.slice(-2))}</strong><em>{data.events.filter(e=>occurs(e,d)&&(filter==="all"||catKey(e)===filter)).length} eventos</em></button>)}</div>
-    <div className={st.tag} style={{marginBottom:10}}>FILTRAR CATEGORIA</div><div className={st.filters}><button className={st.filter+" "+(filter==="all"?st.active:"")} onClick={()=>setFilter("all")}>Todas</button>{allCats.map(c=><button key={c.key} className={st.filter+" "+(filter===c.key?st.active:"")} onClick={()=>setFilter(c.key)}><span className={st.dot} style={{background:c.color}}/><CategoryIcon icon={c.icon}/>{c.label}</button>)}</div>
+    <div className={st.daygrid}>{weekDates.map((d,i)=><button key={d} className={st.day+" "+(selectedDate===d?st.selected:"")} aria-pressed={selectedDate===d} aria-label={dailyDate(d)+", "+data.events.filter(e=>occurs(e,d)&&(filter==="all"||catKey(e)===filter)).length+" compromissos"} onClick={()=>setSelectedDate(d)}><small>{weekLabels[i]}</small><strong>{Number(d.slice(-2))}</strong><em>{data.events.filter(e=>occurs(e,d)&&(filter==="all"||catKey(e)===filter)).length} eventos</em></button>)}</div>
+    <div className={st.tag} style={{marginBottom:10}}>FILTRAR CATEGORIA</div><div className={st.filters}><button className={st.filter+" "+(filter==="all"?st.active:"")} aria-pressed={filter==="all"} onClick={()=>setFilter("all")}>Todas</button>{allCats.map(c=><button key={c.key} className={st.filter+" "+(filter===c.key?st.active:"")} aria-pressed={filter===c.key} onClick={()=>setFilter(c.key)}><span className={st.dot} style={{background:c.color}}/><CategoryIcon icon={c.icon}/>{c.label}</button>)}</div>
     <div className={st.timeline}><h3>{dailyDate(selectedDate)} · {dayEvents.length} compromisso(s)</h3>{dayEvents.length?dayEvents.map(e=><article key={e.id} className={st.entry}><span className={st.time}>{e.all_day?"Dia todo":e.start_time}</span><div className={st.info}><strong>{e.title}</strong><small><span className={st.dot} style={{background:colorFor(catKey(e)),marginRight:5}}/>{nameFor(catKey(e))}{e.repeat_weekly?" · toda semana":e.repeat_yearly?" · todo ano":""}{!e.all_day?" · "+e.start_time+"–"+e.end_time:""}</small></div><button className={st.btn+" "+st.secondary} onClick={()=>suggestMoving(e)}><Edit3 size={13}/> Reorganizar</button></article>):<p className={st.empty}>Não há compromissos nesta data e categoria. Você pode adicionar um novo evento acima.</p>}</div>
    </section>
    <section className={st.card}><div className={st.toolbar}><div><span className={st.tag}>PASSOS CONCRETOS</span><h2>Suas tarefas</h2></div><button onClick={startTask} className={st.btn+" "+st.secondary}><Plus size={15}/> Nova tarefa</button></div>
@@ -189,7 +192,7 @@ export default function LifePage(){
     <label className={st.setting}>Ativar notificações neste navegador<input type="checkbox" checked={prefs.enabled} onChange={e=>setPrefs(s=>({...s,enabled:e.target.checked}))}/></label>
     <label className={st.field}>Antecedência<select value={prefs.lead} onChange={e=>setPrefs(s=>({...s,lead:Number(e.target.value)}))}><option value={15}>15 minutos</option><option value={30}>30 minutos</option><option value={60}>60 minutos</option></select></label>
     {allCats.map(c=><label className={st.setting} key={c.key}><span><i className={st.dot} style={{background:c.color,marginRight:7}}/>{c.label}</span><input type="checkbox" checked={prefs.categories.includes(c.key)} onChange={e=>setPrefs(s=>({...s,categories:e.target.checked?[...s.categories,c.key]:s.categories.filter(k=>k!==c.key)}))}/></label>)}
-    <button className={st.btn} onClick={saveReminders}><Bell size={15}/> Salvar preferências</button><p className={st.helper}>Sem rastreamento de localização e sem envio de notificações quando o navegador estiver fechado. Preferências de aviso são locais deste aparelho.</p>
+    <button className={st.btn} disabled={!prefsReady||!userId} onClick={saveReminders}><Bell size={15}/> Salvar preferências</button><p className={st.helper}>Sem rastreamento de localização e sem envio de notificações quando o navegador estiver fechado. Preferências de aviso são locais deste aparelho.</p>
    </section>
    <section className={st.card}><span className={st.tag}>FACILITE SEU DIA</span><h2>Assistente NEXO</h2><p className={st.muted}>Ditado por voz, importação de horários em PDF, Excel e CSV, e conferência antes de salvar.</p><div className={st.actions}><a className={st.btn} href="/assistente"><Sparkles size={15}/> Abrir assistente</a><button className={st.btn+" "+st.ghost} onClick={read}><RefreshCw size={15}/> Atualizar agenda</button></div></section>
   </aside></div></>}

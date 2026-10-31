@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth-server";
 import { sql } from "@/lib/database";
-import { EventRow, occurs, potentialEventConflicts, validClock, validDay, minutes } from "@/lib/schedule";
+import { EventRow, occurs, potentialEventConflicts, validClock, validDay, minutes, localDayAndTime, slotHasStarted } from "@/lib/schedule";
 
 import { isDefaultCategory, validCategoryName, validCategoryColor, validCategoryIcon, taskCategory } from "@/lib/categories";
 
@@ -143,8 +143,8 @@ export async function POST(request: NextRequest) {
       const start = allDay ? "09:00" : (body.startTime || body.start);
       const end = allDay ? "09:15" : (body.endTime || body.end);
       if (!validDay(day) || !validClock(start) || !validClock(end) || minutes(start) >= minutes(end) || minutes(start) < 8*60 || minutes(end) > 21*60) return err("Horário inválido. Agende entre 08h e 21h.");
-      const serverToday = new Intl.DateTimeFormat("en-CA", {timeZone:"America/Fortaleza", year:"numeric", month:"2-digit", day:"2-digit"}).format(new Date());
-      if (day < serverToday) return err("Não é possível reservar um horário no passado.");
+      const {day: serverToday, time: serverTime} = localDayAndTime();
+      if (slotHasStarted(day, start, serverToday, serverTime)) return err("Não é possível reservar um horário que já começou.");
       const tasks = await sql`SELECT title, due_date::text, status, duration_minutes, subject_id, category, custom_category_id FROM nexo_tasks WHERE id=${taskId} AND user_id=${uid}`;
       if (!tasks.length || tasks[0].status === "done") return err("Tarefa indisponível.", 404);
       if (day > tasks[0].due_date) return err("Esse horário é posterior ao prazo da tarefa.");

@@ -2,9 +2,9 @@ import { addDays, clock, minutes, occurs, overlaps, validClock, validDay, type E
 
 /** Pure, opt-in suggestions: the caller decides whether any change is saved. */
 export function alternativeTimes(
-  current: EventRow, allEvents: EventRow[], today: string, count = 3,
+  current: EventRow, allEvents: EventRow[], today: string, count = 3, timeNow?: string,
 ): { day:string; start_time:string; end_time:string }[] {
-  if (!validDay(current.day) || !validDay(today) || !validClock(current.start_time) || !validClock(current.end_time)) return [];
+  if (!validDay(current.day) || !validDay(today) || !validClock(current.start_time) || !validClock(current.end_time) || (timeNow !== undefined && !validClock(timeNow))) return [];
   if (current.repeat_weekly || current.repeat_yearly || current.all_day) return [];
   const duration = minutes(current.end_time) - minutes(current.start_time);
   if (duration <= 0 || duration > 240 || count < 1) return [];
@@ -15,6 +15,7 @@ export function alternativeTimes(
     for (let start=8*60;start+duration<=21*60 && suggestions.length<count;start+=30) {
       const end=start+duration;
       if(day===current.day && start===minutes(current.start_time)) continue;
+      if(day===today && timeNow && start<=minutes(timeNow)) continue;
       if(busy.some(e=>overlaps(start,end,minutes(e.start_time),minutes(e.end_time)))) continue;
       suggestions.push({day,start_time:clock(start),end_time:clock(end)});
     }

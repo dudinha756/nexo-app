@@ -113,7 +113,7 @@ export default function LifePage(){
  function suggestMoving(e:EventRow){
   if(e.repeat_weekly||e.repeat_yearly){startEvent(e);setError("Este compromisso é recorrente. Editar a data ou o horário modificará a série. Confira antes de salvar.");return}
   startEvent(e);
-  setAlternatives(alternativeTimes(e,data.events,today(),3));
+  setAlternatives(alternativeTimes(e,data.events,today(),3,new Date().toTimeString().slice(0,5)));
  }
  async function suggestTask(t:TaskRow){
   setBusy(true);setPlanTask(t.id);setPlanned([]);setError("");

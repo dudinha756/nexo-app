@@ -28,6 +28,19 @@ export function minutes(t: string) {
   const [h, m] = t.slice(0, 5).split(":").map(Number); return h * 60 + m;
 }
 export function clock(n: number) { return `${String(Math.floor(n / 60)).padStart(2, "0")}:${String(n % 60).padStart(2, "0")}`; }
+/** Resolve a calendar day and clock in the same timezone used for task booking. */
+export function localDayAndTime(now: Date = new Date(), timeZone = "America/Fortaleza") {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone, year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(now);
+  const fields = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return { day: `${fields.year}-${fields.month}-${fields.day}`, time: `${fields.hour}:${fields.minute}` };
+}
+/** A booking must not begin in the past, including earlier today. */
+export function slotHasStarted(day: string, startTime: string, nowDay: string, nowTime: string) {
+  return day < nowDay || (day === nowDay && minutes(startTime) <= minutes(nowTime));
+}
 export function validDay(v: unknown): v is string {
   if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
   const d = parseDay(v); return !Number.isNaN(d.getTime()) && dateStr(d) === v;

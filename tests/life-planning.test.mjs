@@ -20,3 +20,13 @@ test("resumo inclui todas as categorias e recorrências",()=>{
  const counts=categoryCounts(events,"2026-10-26",7);
  assert.equal(counts.work,1);assert.equal(counts.birthday,1);assert.equal(counts.dining,1);
 });
+
+
+test("reorganização não sugere horários já passados no dia atual",()=>{
+ const current=e("jantar","2026-11-02","09:00","10:00");
+ const suggestions=alternativeTimes(current,[current],"2026-11-02",3,"18:15");
+ assert.equal(suggestions.length,3);
+ assert(suggestions.every(s=>s.day!=="2026-11-02"||s.start_time>"18:15"));
+ assert.equal(suggestions[0].start_time,"18:30");
+ assert.deepEqual(alternativeTimes(current,[current],"2026-11-02",3,"25:00"),[]);
+});

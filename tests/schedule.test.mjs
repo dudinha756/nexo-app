@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addDays, monday, occurs, overlaps, suggestedSlots, potentialEventConflicts, validClock, validDay } from '../lib/schedule.ts';
+import { addDays, monday, occurs, overlaps, suggestedSlots, potentialEventConflicts, validClock, validDay, localDayAndTime, slotHasStarted } from '../lib/schedule.ts';
 
 const todo = (extra={}) => ({ id:'t1',title:'Estudar',notes:'',due_date:'2026-11-05',duration_minutes:120,priority:'high',status:'todo',subject_id:null,...extra });
 const event = (d,start,end,repeat=false,taskId=null) => ({id:'e1',title:'Compromisso',day:d,start_time:start,end_time:end,category:'class',repeat_weekly:repeat,task_id:taskId});
@@ -73,4 +73,15 @@ test('repetição anual antiga verifica próxima ocorrência e ignora dia inteir
  const dinner={...event('2026-11-10','19:30','21:00'),id:'dinner',category:'dining'};
  assert.equal(potentialEventConflicts(annual,[dinner],'2026-10-30')[0]?.day,'2026-11-10');
  assert.deepEqual(potentialEventConflicts({...annual,all_day:true},[dinner],'2026-10-30'),[]);
+});
+
+
+test('horário local de reserva independe do formato de data do servidor',()=>{
+ const local=localDayAndTime(new Date('2026-11-01T00:30:00Z'));
+ assert.deepEqual(local,{day:'2026-10-31',time:'21:30'});
+ assert.equal(slotHasStarted('2026-10-31','20:00',local.day,local.time),true);
+ assert.equal(slotHasStarted('2026-10-31','21:30',local.day,local.time),true);
+ assert.equal(slotHasStarted('2026-10-31','21:45',local.day,local.time),false);
+ assert.equal(slotHasStarted('2026-11-01','08:00',local.day,local.time),false);
+ assert.equal(slotHasStarted('2026-10-30','23:00',local.day,local.time),true);
 });

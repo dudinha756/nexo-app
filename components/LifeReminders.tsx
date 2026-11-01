@@ -2,7 +2,7 @@
 import {useEffect} from "react";
 import {authClient} from "@/lib/auth-client";
 import {occurs,minutes,type EventRow} from "@/lib/schedule";
-type Settings={enabled:boolean;lead:number;categories:string[]};
+import {maySendReminder,normalizeReminderSettings,type ReminderSettings} from "@/lib/reminder-policy";
 const isoToday=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-")};
 /** An optional in-browser reminder. No service worker, background push or server monitoring. */
 export default function LifeReminders(){
@@ -30,15 +30,20 @@ export default function LifeReminders(){
   function tick(){
    if(!alive||document.visibilityState!=="visible"||!userId)return;
    if(!("Notification" in window)||Notification.permission!=="granted")return;
-   let prefs:Settings;
+   let prefs:ReminderSettings;
    try{
     const saved=localStorage.getItem("nexo:life-reminders:"+userId);
     if(!saved)return;
-    prefs=JSON.parse(saved);
-    if(!prefs?.enabled||![15,30,60].includes(prefs.lead)||!Array.isArray(prefs.categories))return;
+    const normalized=normalizeReminderSettings(JSON.parse(saved));
+    if(!normalized?.enabled)return;
+    prefs=normalized;
    }catch{return}
    const date=isoToday(),now=new Date(),nowMin=now.getHours()*60+now.getMinutes();
+   const countKey="nexo:sent-count:"+userId+":"+date;
+   let sentToday=Number(localStorage.getItem(countKey)||"0");
+   if(!Number.isInteger(sentToday)||sentToday<0)sentToday=0;
    for(const e of events){
+    if(!maySendReminder(sentToday,prefs.maxDaily))break;
     const cat=e.custom_category_id?"custom:"+e.custom_category_id:e.category;
     if(!prefs.categories.includes(cat))continue;
     let body="";
@@ -57,6 +62,8 @@ export default function LifeReminders(){
     try{
      localStorage.setItem(marker,String(Date.now()));
      const n=new Notification("NEXO · "+(e.all_day?"Data importante":"Compromisso próximo"),{body,icon:"/icon.svg",tag:marker});
+     sentToday++;
+     localStorage.setItem(countKey,String(sentToday));
      n.onclick=()=>{window.focus();window.location.href="/vida";n.close()};
     }catch{localStorage.removeItem(marker)}
    }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth-server";
 import { sql } from "@/lib/database";
-import { validClock, validDay, suggestedSlots, EventRow, TaskRow } from "@/lib/schedule";
+import { validClock, validDay, suggestedSlots, boundedPlanningClock, localDayAndTime, EventRow, TaskRow } from "@/lib/schedule";
 
 export const runtime = "nodejs";
 export async function POST(request: NextRequest) {
@@ -16,7 +16,9 @@ export async function POST(request: NextRequest) {
     const tasks = await sql`SELECT id, title, due_date::text, status, duration_minutes FROM nexo_tasks WHERE id=${taskId} AND user_id=${uid}`;
     if (!tasks.length) return NextResponse.json({ error: "Tarefa não encontrada." }, { status: 404 });
     const events = await sql`SELECT id, title, day::text, to_char(start_time,'HH24:MI') AS start_time, to_char(end_time,'HH24:MI') AS end_time, category, repeat_weekly, repeat_yearly, all_day, task_id FROM nexo_events WHERE user_id=${uid}`;
-    const slots = suggestedSlots(tasks[0] as TaskRow, events as EventRow[], today, time);
+    const serverClock = localDayAndTime();
+    const safeClock = boundedPlanningClock(today, time, serverClock.day, serverClock.time);
+    const slots = suggestedSlots(tasks[0] as TaskRow, events as EventRow[], safeClock.day, safeClock.time);
     const planned = (events as EventRow[]).filter(e => e.task_id === taskId).reduce((sum, e) => {
       const [a,b] = [e.start_time,e.end_time].map(t => Number(t.slice(0,2))*60+Number(t.slice(3,5)));
       return sum+b-a;

@@ -3,6 +3,7 @@ import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {ArrowLeft,ArrowRight,CalendarDays,Check,CheckCircle2,Clock,Edit3,Plus,RefreshCw,Save,Bell,BookOpen,LifeBuoy,Sparkles,X,AlertTriangle,BriefcaseBusiness,Dumbbell,GraduationCap,Cake,Utensils,Users,HeartHandshake,HeartPulse,Sun,Tag,Plane,Camera,ShoppingBag,Music,type LucideIcon} from "lucide-react";
 import {authClient} from "@/lib/auth-client";
 import {DEFAULT_CATEGORIES,type CustomCategoryRow} from "@/lib/categories";
+import {normalizeReminderSettings,type ReminderSettings} from "@/lib/reminder-policy";
 import {addDays,monday,occurs,minutes,type EventRow,type TaskRow} from "@/lib/schedule";
 import {alternativeTimes,categoryCounts} from "@/lib/life-planning";
 import st from "./vida.module.css";
@@ -10,12 +11,11 @@ import st from "./vida.module.css";
 type Payload={events:EventRow[];tasks:TaskRow[];categories:CustomCategoryRow[]};
 type EventForm={title:string;day:string;startTime:string;endTime:string;category:string;repeatWeekly:boolean;repeatYearly:boolean;allDay:boolean};
 type TaskForm={title:string;dueDate:string;durationMinutes:number;priority:"low"|"medium"|"high";category:string;notes:string};
-type ReminderSettings={enabled:boolean;lead:number;categories:string[]};
 const today=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-")};
 const dailyDate=(d:string)=>new Date(d+"T12:00:00Z").toLocaleDateString("pt-BR",{day:"2-digit",month:"short",timeZone:"UTC"});
 const eventDefaults=():EventForm=>({title:"",day:today(),startTime:"09:00",endTime:"10:00",category:"personal",repeatWeekly:false,repeatYearly:false,allDay:false});
 const taskDefaults=():TaskForm=>({title:"",dueDate:today(),durationMinutes:60,priority:"medium",category:"personal",notes:""});
-const reminderDefaults:ReminderSettings={enabled:false,lead:30,categories:DEFAULT_CATEGORIES.map(c=>c.id)};
+const reminderDefaults:ReminderSettings={enabled:false,lead:30,categories:DEFAULT_CATEGORIES.map(c=>c.id),maxDaily:5};
 const ICONS:Record<string,LucideIcon>={"briefcase-business":BriefcaseBusiness,"dumbbell":Dumbbell,"graduation-cap":GraduationCap,"book-open":BookOpen,"calendar-days":CalendarDays,"cake":Cake,"utensils":Utensils,"users":Users,"heart-handshake":HeartHandshake,"heart-pulse":HeartPulse,"sun":Sun,"tag":Tag,"plane":Plane,"camera":Camera,"shopping-bag":ShoppingBag,"music":Music};
 function CategoryIcon({icon}:{icon:string}){const Icon=ICONS[icon]||Tag;return <Icon size={13} aria-hidden="true"/>;}
 const iconChoices=[["tag","Marcador"],["plane","Viagens"],["camera","Fotografia"],["shopping-bag","Compras"],["music","Música"],["heart-pulse","Saúde"],["briefcase-business","Trabalho"],["dumbbell","Exercícios"],["book-open","Leitura"],["cake","Comemorações"],["utensils","Gastronomia"],["sun","Lazer"]];
@@ -81,7 +81,7 @@ export default function LifePage(){
   if(!userId)return;
   try{
    const raw=localStorage.getItem("nexo:life-reminders:"+userId);
-   if(raw){const p=JSON.parse(raw);if(p&&typeof p.enabled==="boolean"&&[15,30,60].includes(p.lead)&&Array.isArray(p.categories))setPrefs(p)}
+   if(raw){const saved=normalizeReminderSettings(JSON.parse(raw));if(saved)setPrefs(saved)}
   }catch{}
   setPrefsReady(true);
  },[userId]);
@@ -155,17 +155,24 @@ export default function LifePage(){
    await read();setSuccess("Horário reservado na agenda.");await suggestTask(t)
   }catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy(false)}
  }
- function saveReminders(){
-  if(!userId){setError("Faça login para configurar os avisos.");return}
-  if(prefs.enabled && "Notification" in window && Notification.permission!=="granted"){
-   Notification.requestPermission().then(p=>{
-    if(p!=="granted"){setError("Seu navegador não autorizou notificações. A configuração não foi ativada.");return}
-    localStorage.setItem("nexo:life-reminders:"+userId,JSON.stringify(prefs));setSuccess("Avisos ativados neste navegador, enquanto o NEXO estiver aberto.");
-   });return;
-  }
-  if(prefs.enabled && !("Notification" in window)){setError("Este navegador não oferece notificações.");return}
-  localStorage.setItem("nexo:life-reminders:"+userId,JSON.stringify(prefs));
-  setSuccess(prefs.enabled?"Avisos configurados para este navegador.":"Avisos desativados.");
+ async function saveReminders(){
+  const account=userId;
+  if(!account){setError("Faça login para configurar os avisos.");return}
+  try{
+   if(prefs.enabled && !("Notification" in window)){setError("Este navegador não oferece notificações.");return}
+   // Request permission directly from the user's click, before any async session read.
+   if(prefs.enabled && Notification.permission!=="granted"){
+    const permission=await Notification.requestPermission();
+    if(permission!=="granted"){setError("Seu navegador não autorizou notificações. A configuração não foi ativada.");return}
+   }
+   const session=await authClient.getSession();
+   if(session.data?.user?.id!==account){
+    setError("Sua sessão mudou. Atualize a agenda antes de salvar os avisos.");
+    void read();return;
+   }
+   localStorage.setItem("nexo:life-reminders:"+account,JSON.stringify(prefs));
+   setError("");setSuccess(prefs.enabled?"Avisos configurados para este navegador.":"Avisos desativados.");
+  }catch{setError("Não foi possível salvar os avisos neste navegador.")}
  }
 
  return <main className={st.shell}><div className={st.wrap}>
@@ -216,6 +223,7 @@ export default function LifePage(){
    <section className={st.card}><span className={st.tag}>AVISOS COM CONTROLE</span><h2>Lembretes por categoria</h2><p className={st.muted}>Escolha quais áreas merecem avisos e com quanto tempo de antecedência. Os avisos aparecem quando o NEXO estiver aberto e o navegador permitir notificações.</p>
     <label className={st.setting}>Ativar notificações neste navegador<input type="checkbox" checked={prefs.enabled} onChange={e=>setPrefs(s=>({...s,enabled:e.target.checked}))}/></label>
     <label className={st.field}>Antecedência<select value={prefs.lead} onChange={e=>setPrefs(s=>({...s,lead:Number(e.target.value)}))}><option value={15}>15 minutos</option><option value={30}>30 minutos</option><option value={60}>60 minutos</option></select></label>
+    <label className={st.field}>Máximo de avisos por dia<select value={prefs.maxDaily} onChange={e=>setPrefs(s=>({...s,maxDaily:Number(e.target.value)}))}><option value={1}>1 aviso</option><option value={3}>3 avisos</option><option value={5}>5 avisos</option><option value={10}>10 avisos</option></select></label>
     {allCats.map(c=><label className={st.setting} key={c.key}><span><i className={st.dot} style={{background:c.color,marginRight:7}}/>{c.label}</span><input type="checkbox" checked={prefs.categories.includes(c.key)} onChange={e=>setPrefs(s=>({...s,categories:e.target.checked?[...s.categories,c.key]:s.categories.filter(k=>k!==c.key)}))}/></label>)}
     <button className={st.btn} disabled={!prefsReady||!userId} onClick={saveReminders}><Bell size={15}/> Salvar preferências</button><p className={st.helper}>Sem rastreamento de localização e sem envio de notificações quando o navegador estiver fechado. Preferências de aviso são locais deste aparelho.</p>
    </section>

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addDays, monday, occurs, overlaps, suggestedSlots, potentialEventConflicts, validClock, validDay, localDayAndTime, slotHasStarted } from '../lib/schedule.ts';
+import { addDays, monday, occurs, overlaps, suggestedSlots, potentialEventConflicts, validClock, validDay, localDayAndTime, slotHasStarted, boundedPlanningClock } from '../lib/schedule.ts';
 
 const todo = (extra={}) => ({ id:'t1',title:'Estudar',notes:'',due_date:'2026-11-05',duration_minutes:120,priority:'high',status:'todo',subject_id:null,...extra });
 const event = (d,start,end,repeat=false,taskId=null) => ({id:'e1',title:'Compromisso',day:d,start_time:start,end_time:end,category:'class',repeat_weekly:repeat,task_id:taskId});
@@ -84,4 +84,13 @@ test('horário local de reserva independe do formato de data do servidor',()=>{
  assert.equal(slotHasStarted('2026-10-31','21:45',local.day,local.time),false);
  assert.equal(slotHasStarted('2026-11-01','08:00',local.day,local.time),false);
  assert.equal(slotHasStarted('2026-10-30','23:00',local.day,local.time),true);
+});
+
+test('planejamento não confia em relógio do cliente anterior ao servidor',()=>{
+ assert.deepEqual(boundedPlanningClock('2026-10-31','23:30','2026-11-01','08:05'),{day:'2026-11-01',time:'08:05'});
+ assert.deepEqual(boundedPlanningClock('2026-11-01','07:00','2026-11-01','08:05'),{day:'2026-11-01',time:'08:05'});
+ assert.deepEqual(boundedPlanningClock('2026-11-01','09:00','2026-11-01','08:05'),{day:'2026-11-01',time:'09:00'});
+ const clock=boundedPlanningClock('2026-11-01','07:00','2026-11-01','08:05');
+ const slots=suggestedSlots(todo({due_date:'2026-11-01',duration_minutes:60}),[],clock.day,clock.time);
+ assert(slots.every(slot=>slot.start_time>='08:30'));
 });

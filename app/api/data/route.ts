@@ -24,7 +24,7 @@ export async function GET() {
       sql`SELECT id, title, day::text, to_char(start_time,'HH24:MI') AS start_time, to_char(end_time,'HH24:MI') AS end_time, COALESCE(category_key,category) AS category, custom_category_id, repeat_weekly, repeat_yearly, all_day, task_id FROM nexo_events WHERE user_id=${uid} ORDER BY day, start_time`,
       sql`SELECT id, name, color, icon FROM nexo_categories WHERE user_id=${uid} ORDER BY created_at, name`
     ]);
-    return NextResponse.json({ subjects, tasks, events, categories });
+    return NextResponse.json({ userId: uid, subjects, tasks, events, categories });
   } catch (e) {
     console.error("nexo/data/get", e);
     return err("Não foi possível carregar seus dados. Tente novamente.", 500);

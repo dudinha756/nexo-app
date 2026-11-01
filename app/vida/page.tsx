@@ -1,5 +1,5 @@
 "use client";
-import {useCallback,useEffect,useMemo,useState} from "react";
+import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {ArrowLeft,ArrowRight,CalendarDays,Check,CheckCircle2,Clock,Edit3,Plus,RefreshCw,Save,Bell,BookOpen,LifeBuoy,Sparkles,X,AlertTriangle,BriefcaseBusiness,Dumbbell,GraduationCap,Cake,Utensils,Users,HeartHandshake,HeartPulse,Sun,Tag,Plane,Camera,ShoppingBag,Music,type LucideIcon} from "lucide-react";
 import {authClient} from "@/lib/auth-client";
 import {DEFAULT_CATEGORIES,type CustomCategoryRow} from "@/lib/categories";
@@ -39,16 +39,41 @@ export default function LifePage(){
  const [alternatives,setAlternatives]=useState<{day:string;start_time:string;end_time:string}[]>([]);
  const [planTask,setPlanTask]=useState(""),[planned,setPlanned]=useState<{day:string;start_time:string;end_time:string}[]>([]);
  const [prefs,setPrefs]=useState<ReminderSettings>(reminderDefaults),[prefsReady,setPrefsReady]=useState(false);
+ const readSequence=useRef(0);
  const read=useCallback(async()=>{
+  // Hide the previous account's agenda while revalidating the server session.
+  const sequence=++readSequence.current;
+  setLoading(true);
   try{
    const r=await fetch("/api/data",{cache:"no-store"});
-   if(r.status===401){setUnauthorized(true);setLoading(false);return}
-   const p=await r.json();if(!r.ok)throw Error(p.error||"Não foi possível carregar.");
-   setData({events:p.events||[],tasks:p.tasks||[],categories:p.categories||[]});setUnauthorized(false);setError("");
-  }catch(e){setError(e instanceof Error?e.message:String(e))}
-  finally{setLoading(false)}
+   if(sequence!==readSequence.current)return;
+   if(r.status===401){
+    setData({events:[],tasks:[],categories:[]});setUserId("");
+    setUnauthorized(true);setError("");return;
+   }
+   const p=await r.json();
+   if(sequence!==readSequence.current)return;
+   if(!r.ok)throw Error(p.error||"Não foi possível carregar.");
+   if(typeof p.userId!=="string"||!p.userId)throw Error("Não foi possível confirmar sua sessão.");
+   setData({events:p.events||[],tasks:p.tasks||[],categories:p.categories||[]});
+   setUserId(p.userId);setUnauthorized(false);setError("");
+  }catch(e){
+   if(sequence!==readSequence.current)return;
+   setData({events:[],tasks:[],categories:[]});setUserId("");
+   setUnauthorized(false);setError(e instanceof Error?e.message:String(e));
+  }finally{if(sequence===readSequence.current)setLoading(false)}
  },[]);
- useEffect(()=>{read();authClient.getSession().then(r=>setUserId(r.data?.user?.id||"")).catch(()=>{})},[read]);
+ useEffect(()=>{
+  void read();
+  const revalidate=()=>{if(document.visibilityState==="visible")void read()};
+  window.addEventListener("focus",revalidate);
+  document.addEventListener("visibilitychange",revalidate);
+  return ()=>{window.removeEventListener("focus",revalidate);document.removeEventListener("visibilitychange",revalidate)};
+ },[read]);
+ useEffect(()=>{
+  // Do not retain draft forms or task suggestions across account switches.
+  setMode(null);setPlanTask("");setPlanned([]);setFilter("all");
+ },[userId]);
  useEffect(()=>{
   // Preferences belong to the signed-in user, not the previous account.
   setPrefs({...reminderDefaults,categories:[...reminderDefaults.categories]});

@@ -41,6 +41,13 @@ export function localDayAndTime(now: Date = new Date(), timeZone = "America/Fort
 export function slotHasStarted(day: string, startTime: string, nowDay: string, nowTime: string) {
   return day < nowDay || (day === nowDay && minutes(startTime) <= minutes(nowTime));
 }
+/** Client clocks may be stale or behind the booking server. Never propose past slots. */
+export function boundedPlanningClock(clientDay: string, clientTime: string, serverDay: string, serverTime: string) {
+  if (clientDay < serverDay || (clientDay === serverDay && minutes(clientTime) < minutes(serverTime))) {
+    return { day: serverDay, time: serverTime };
+  }
+  return { day: clientDay, time: clientTime };
+}
 export function validDay(v: unknown): v is string {
   if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
   const d = parseDay(v); return !Number.isNaN(d.getTime()) && dateStr(d) === v;

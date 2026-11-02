@@ -16,7 +16,7 @@ test('extrai grade de aulas com dias como colunas e horas nas linhas',()=>{
  const w=[token('Horário',10,700),token('Segunda',140,700),token('Terça',290,700),token('Quarta',440,700),token('19:00 - 20:30',10,660,100),token('Macroeconomia',140,660),token('Contabilidade',290,660),token('Direito',440,660)];
  const r=interpretPdfLayout(w);
  assert.deepEqual(r.tables[0],['Dia','Atividade','Início','Fim']);
- assert.deepEqual(r.tables.slice(1),[['segunda','Aula: Macroeconomia','19:00','20:30'],['terca','Aula: Contabilidade','19:00','20:30'],['quarta','Aula: Direito','19:00','20:30']]);
+ assert.deepEqual(r.tables.slice(1),[['segunda','Macroeconomia','19:00','20:30'],['terca','Contabilidade','19:00','20:30'],['quarta','Direito','19:00','20:30']]);
 });
 test('extrai tabela tradicional com colunas Dia Atividade Início Fim',()=>{
  const w=[token('Dia',10,800),token('Atividade',120,800),token('Início',280,800),token('Fim',400,800),token('Quinta',10,770),token('Trabalho',120,770),token('08:30',280,770),token('16:30',400,770)];
@@ -26,4 +26,10 @@ test('extrai tabela tradicional com colunas Dia Atividade Início Fim',()=>{
 test('extrai linhas narrativas em PDF sem tabela',()=>{
  const r=interpretPdfLayout([token('Trabalho de quinta a terça, das 8h30 às 16h30',10,500)]);
  assert.equal(r.statements[0],'Trabalho de quinta a terça, das 8h30 às 16h30');
+});
+
+test('grade semanal não presume que trabalho e treino sejam aulas',()=>{
+ const words=[token('Horário',10,700),token('Segunda',140,700),token('Terça',290,700),token('08:30 - 09:30',10,660,100),token('Trabalho',140,660),token('Treino',290,660)];
+ const parsed=interpretPdfLayout(words);
+ assert.deepEqual(parsed.tables.slice(1),[['segunda','Trabalho','08:30','09:30'],['terca','Treino','08:30','09:30']]);
 });

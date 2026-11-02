@@ -54,7 +54,8 @@ function parseNaturalDate(input:string,today:string):string|null{
   if(/\bdepois de amanha\b/.test(s))return addDays(today,2);
   if(/\bamanha\b/.test(s))return addDays(today,1);
   if(/\bhoje\b/.test(s))return today;
-  const m=s.match(/\bdia\s+(primeiro|1[º°]?|\d{1,2})(?:\s+de\s+([a-zç]+|\d{1,2}))?(?:\s+de\s+(\d{4}))?/)||s.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?/);
+  // Datas numéricas têm precedência, inclusive em frases como "dia 03/11/2026".
+  const m=s.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?\b/)||s.match(/\bdia\s+(primeiro|1[º°]?|\d{1,2})(?:\s+de\s+([a-zç]+|\d{1,2}))?(?:\s+de\s+(\d{4}))?/);
   if(!m){ const weekday=weekdayIndex(s); return weekday>=0 ? nextWeekday(weekday,today) : null; }
   const day=m[1]==='primeiro'?1:parseInt(m[1]);
   let mo=m[2]?months.indexOf(m[2])+1 || parseInt(m[2]):b.getUTCMonth()+1;
@@ -70,14 +71,15 @@ function parseNaturalDate(input:string,today:string):string|null{
 export function getCategory(text:string){
  const s=unaccent(text);
  if(/aniversario|niver|parabens/.test(s))return 'birthday';
- if(/consulta|medico|dentista|exame|psicolog|terapia|vacina|hospital/.test(s))return 'health';
- if(/jantar|almoco|restaurante|brunch|cafe da manha|pizzaria/.test(s))return 'dining';
+ if(/saude|consulta|medico|dentista|exame|psicolog|terapia|vacina|hospital/.test(s))return 'health';
+ if(/jantar|almoco|refeic|restaurante|brunch|cafe da manha|pizzaria/.test(s))return 'dining';
  if(/amig[oa]s?|encontro com a turma|happy hour|reuniao de amigos/.test(s))return 'friends';
  if(/familia|mae|pai|irma[oa]|avos?|sobrinh[oa]|filh[oa]/.test(s))return 'family';
  if(/viagem|ferias|cinema|show|passeio|festa|lazer|praia|teatro|festival/.test(s))return 'leisure';
  if(/trabalh|expediente|plantao|reuniao profissional|cliente|fornecedor|escritorio/.test(s))return 'work';
- if(/treino|academia|corrida|jiu|muay|musculacao|pilates|ciclismo|beach tennis|natacao|yoga/.test(s))return 'training';
+ if(/atividade fisica|treino|academia|corrida|jiu|muay|musculacao|pilates|ciclismo|beach tennis|natacao|yoga/.test(s))return 'training';
  if(/faculdade|aula|curso|prova|seminario/.test(s))return 'class';
+ if(/\boutros\b/.test(s))return 'other';
  if(/estud|revis|leitura|pesquisa|artigo|redacao|exercicio academico/.test(s))return 'study';
  return 'personal';
 }
@@ -140,14 +142,17 @@ export function interpretRows(rows:unknown[][],today=iso(new Date())):Intake {
   const row=rows[i];if(!row.some(c=>text(c)))continue;
   const dayText=text(row[cols.day]);const days=parseWeekdays(dayText);let date=validDay(dayText)?dayText: null;
   const dayNum=dayText.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?$/);
-  if(!date&&dayNum)date=interpretText(`dia ${dayNum[1]}/${dayNum[2]}${dayNum[3]?'/'+dayNum[3]:''}`,today).items[0]?.day||null;
+  if(!date&&dayNum)date=parseNaturalDate(dayText,today);
   const title=text(cols.title===undefined?'Compromisso':row[cols.title])||'Compromisso';
   const range=cols.range!==undefined?timeRange(text(row[cols.range])):null;
   const start=range?.startTime || parseTime(row[cols.start]);const end=range?.endTime||parseTime(row[cols.end]);
+  const category=getCategory(cols.category===undefined?title:text(row[cols.category]));
+  // Eventos datados sem horário são de dia inteiro; nunca inventar um horário.
+  if(!start&&!end&&date){all.push(item({title,day:date,allDay:true,repeatYearly:category==='birthday',category,source:`Linha ${i+1}`}));continue;}
   if(!start||!end||start>=end){ignored.push(`Linha ${i+1}: horário ausente ou inválido (${title}).`);continue;}
   const repeat=cols.repeat===undefined?true:/^(sim|s|semanal|toda|todos|true|1)$/i.test(text(row[cols.repeat]));
-  if(days.length){for(const dow of days)all.push(item({title,day:nextWeekday(dow,today),startTime:start,endTime:end,repeatWeekly:repeat,category:getCategory(cols.category===undefined?title:text(row[cols.category])),source:`Linha ${i+1}`}));}
-  else if(date){all.push(item({title,day:date,startTime:start,endTime:end,category:getCategory(cols.category===undefined?title:text(row[cols.category])),source:`Linha ${i+1}`}));}
+  if(days.length){for(const dow of days)all.push(item({title,day:nextWeekday(dow,today),startTime:start,endTime:end,repeatWeekly:repeat,category,source:`Linha ${i+1}`}));}
+  else if(date){all.push(item({title,day:date,startTime:start,endTime:end,category,source:`Linha ${i+1}`}));}
   else ignored.push(`Linha ${i+1}: dia não identificado (${title}).`);
  }
  return {items:all,ignored};

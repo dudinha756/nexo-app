@@ -58,7 +58,8 @@ export function interpretPdfLayout(words:PdfWord[]):PdfPageData{
     }
     for(const [day,parts] of cells){const name=parts.join(' ').trim();if(name&&!/^(?:-+|livre|intervalo|vago|recreio|sem aula|folga)$/i.test(plain(name))){
        if(tables.length===0)tables.push(['Dia','Atividade','Início','Fim']);
-       tables.push([day,`Aula: ${name}`,slot.start,slot.end]);
+       // A grade pode conter trabalho, treinos, família ou aulas: não presumir contexto acadêmico.
+       tables.push([day,name,slot.start,slot.end]);
     }}
     continue;
    }

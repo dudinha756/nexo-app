@@ -66,7 +66,7 @@ export default function AssistantPage(){
  }
  function set(id:string,key:keyof DraftItem,val:unknown){setItems(arr=>arr.map(x=>x.id===id?{...x,[key]:val}:x))}
  const duplicate=(d:DraftItem)=>existing.some(e=>e.title.toLowerCase()===d.title.toLowerCase()&&e.day===d.day&&e.start_time===(d.startTime||'09:00')&&e.end_time===(d.endTime||'09:15')&&!!e.repeat_weekly===d.repeatWeekly);
- async function save(){setBusy(true);setError('');let ok=0,skip=0,fail=0;for(const d of items.filter(x=>x.selected)){
+ async function save(){setBusy(true);setError('');let ok=0,skip=0,fail=0;const savedIds=new Set<string>();for(const d of items.filter(x=>x.selected)){
   if(!d.title.trim()||!d.day){fail++;continue}if(d.kind==='event'&&duplicate(d)){skip++;continue}
   const key=d.category.startsWith("custom:")?d.category.slice(7):null;
    const category=key?"other":d.category;
@@ -81,8 +81,8 @@ export default function AssistantPage(){
       if(!window.confirm('Possível conflito com: '+detail+'. Deseja incluir mesmo assim?')){skip++;continue}
      }
     }
-    const r=await fetch('/api/data',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});if(!r.ok){const e=await r.json();throw Error(e.error)}ok++}catch(e){fail++;setError('Alguns itens não foram salvos: '+String(e))}
- }setBusy(false);setMessage(`${ok} salvo(s); ${skip} duplicado(s) ignorado(s); ${fail} com erro.`);if(ok){setItems([]);await refresh()}}
+    const r=await fetch('/api/data',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});if(!r.ok){const e=await r.json();throw Error(e.error)}ok++;savedIds.add(d.id)}catch(e){fail++;setError('Alguns itens não foram salvos: '+String(e))}
+ }setBusy(false);setMessage(`${ok} salvo(s); ${skip} ignorado(s); ${fail} com erro. Itens não salvos continuam disponíveis para revisão.`);if(ok){setItems(previous=>previous.filter(d=>!savedIds.has(d.id)));await refresh()}}
  return <main className={styles.shell}><div className={styles.wrap}><a href="/" className={styles.back}><ArrowLeft size={16}/> Voltar ao NEXO</a><span className={styles.eyebrow}>NEXO · ASSISTENTE DE ROTINA</span><h1>Organize falando.</h1><p className={styles.intro}>Importe seus horários, dite lembretes ou escreva compromissos. Revise tudo antes de incluir na agenda.</p>
  <div className={styles.grid}><section className={styles.card}><span className={styles.eyebrow}>01 · VOZ E TEXTO</span><h2>Fale. O NEXO interpreta.</h2><textarea placeholder="Ex.: Dia 3 de novembro tenho prova de Macroeconomia às 7 da noite" rows={4} value={text} onChange={e=>setText(e.target.value)}/><div className={styles.actions}><button onClick={record}>{listening?<MicOff size={17}/>:<Mic size={17}/>} {listening?'Parar gravação':'Gravar fala'}</button><button disabled={!text.trim()} onClick={()=>parse(text)}>Interpretar texto</button></div><small>O reconhecimento de voz depende do navegador e pode usar serviço do fornecedor. O NEXO não armazena áudio.</small></section>
  <section className={styles.card}><span className={styles.eyebrow}>02 · IMPORTAÇÃO</span><h2>Sua agenda em uma planilha ou PDF.</h2><p>Importe <strong>PDF (.pdf)</strong>, Excel (.xlsx), CSV ou TSV. PDF: até 8 MB e 25 páginas. Outros formatos: até 3 MB. Prefira tabelas com Dia, Atividade, Início e Fim ou grades semanais.</p><label className={styles.upload}><FileSpreadsheet size={20}/> {busy?"Analisando arquivo...":"Escolher PDF ou planilha"} <input type="file" accept=".pdf,application/pdf,.xlsx,.csv,.tsv,.txt" disabled={busy} onChange={upload}/></label>{fileLabel&&<small role="status">Último arquivo selecionado: {fileLabel}</small>}<small>Leitura do PDF no próprio navegador, sem envio do arquivo a terceiros. PDFs digitalizados sem texto ainda não têm OCR.</small><div className={styles.examples}>{examples.map(v=><button key={v} onClick={()=>{setText(v);parse(v)}}>{v}</button>)}</div></section></div>

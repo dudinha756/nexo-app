@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {layoutLines,interpretPdfLayout,pdfTimeRange} from '../lib/pdf-layout.ts';
+import {interpretRows} from '../lib/intake.ts';
 const token=(str,x,y,width=60)=>({str,x,y,width});
 test('detecta horários explícitos em textos de grades',()=>{
  assert.deepEqual(pdfTimeRange('08:30 – 16:30'),{start:'08:30',end:'16:30'});
@@ -32,4 +33,11 @@ test('grade semanal não presume que trabalho e treino sejam aulas',()=>{
  const words=[token('Horário',10,700),token('Segunda',140,700),token('Terça',290,700),token('08:30 - 09:30',10,660,100),token('Trabalho',140,660),token('Treino',290,660)];
  const parsed=interpretPdfLayout(words);
  assert.deepEqual(parsed.tables.slice(1),[['segunda','Trabalho','08:30','09:30'],['terca','Treino','08:30','09:30']]);
+});
+
+test('PDF semanal é classificado por área da vida até a prévia, sem gravar dados',()=>{
+ const words=[token('Horário',10,700),token('Segunda',140,700),token('Terça',290,700),token('08:30 - 09:30',10,660,100),token('Trabalho',140,660),token('Musculação',290,660)];
+ const layout=interpretPdfLayout(words);
+ const preview=interpretRows(layout.tables,'2026-11-02');
+ assert.deepEqual(preview.items.map(x=>[x.day,x.title,x.category,x.repeatWeekly]),[['2026-11-02','Trabalho','work',true],['2026-11-03','Musculação','training',true]]);
 });

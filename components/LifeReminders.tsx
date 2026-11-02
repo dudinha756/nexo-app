@@ -23,6 +23,8 @@ export default function LifeReminders(){
     if(!r.ok){events=[];return false}
     const j=await r.json();
     if(!alive)return false;
+    // A resposta também deve pertencer à sessão verificada antes da consulta.
+    if(typeof j.userId!=="string"||j.userId!==current){events=[];return false}
     events=Array.isArray(j.events)?j.events:[];
     return true;
    }catch{events=[];return false}finally{inProgress=false}

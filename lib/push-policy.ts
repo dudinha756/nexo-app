@@ -34,6 +34,15 @@ export function pushForEvent(e:EventRow,prefs:PushPrefs,timezone:string,at:Date)
   url:"/vida",kind:"event"
  };
 }
+export type PushTask={id:string;title:string;due_date:string;status:string;category:string;custom_category_id?:string|null};
+export function pushForTask(t:PushTask,prefs:PushPrefs,timezone:string,at:Date):PushCandidate|null {
+ if(!prefs.enabled||t.status==="done"||!validPushZone(timezone))return null;
+ const category=t.custom_category_id?"custom:"+t.custom_category_id:t.category;
+ if(!prefs.categories.includes(category))return null;
+ const local=localClock(at,timezone);
+ if(t.due_date!==local.day||local.minute<8*60||local.minute>12*60)return null;
+ return {reminderKey:"task:"+t.id+":"+local.day,localDay:local.day,title:"NEXO · Tarefa para hoje",body:"Hoje vence: "+t.title,url:"/vida",kind:"event"};
+}
 export function pushForBriefing(pref:BriefingSetting,at:Date):PushCandidate|null {
  if(!pref.enabled||!validPushZone(pref.timezone)||!/^\d{2}:\d{2}$/.test(pref.briefing_time))return null;
  const local=localClock(at,pref.timezone);

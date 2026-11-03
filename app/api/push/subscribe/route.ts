@@ -42,6 +42,12 @@ export async function POST(req:NextRequest){
     const counts=await sql`SELECT count(*)::int AS n FROM nexo_push_subscriptions WHERE user_id=${uid}`;
     if(Number(counts[0].n)>=8)return fail("Limite de oito dispositivos conectados. Desative um dispositivo antes de continuar.",409);
    }
+   // Reusing the same browser for a different account must not inherit
+   // the prior account's delivery counters or daily briefing markers.
+   if(matching.length&&matching[0].user_id!==uid){
+    await sql`DELETE FROM nexo_push_deliveries
+      WHERE subscription_id=(SELECT id FROM nexo_push_subscriptions WHERE endpoint=${endpoint})`;
+   }
    const settingsJson=JSON.stringify(settings);
    await sql`INSERT INTO nexo_push_subscriptions(user_id,endpoint,p256dh,auth,timezone,settings,enabled,updated_at)
     VALUES(${uid},${endpoint},${key},${authKey},${zone},${settingsJson}::jsonb,true,now())

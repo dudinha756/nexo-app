@@ -1,0 +1,44 @@
+name: NEXO — Push com o site fechado
+on:
+  schedule:
+    # GitHub Actions may delay or skip scheduled jobs during heavy load.
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+
+concurrency:
+  group: nexo-push-dispatch
+  cancel-in-progress: false
+
+jobs:
+  deliver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Chamar servidor push com identidade GitHub verificada
+        env:
+          ACTIONS_ID_TOKEN_REQUEST_URL: {{ env.ACTIONS_ID_TOKEN_REQUEST_URL }}
+          ACTIONS_ID_TOKEN_REQUEST_TOKEN: {{ env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
+        run: |
+          node <<'NODE'
+          (async function () {
+            const audience="nexo-push-dispatch";
+            const oidc=new URL(process.env.ACTIONS_ID_TOKEN_REQUEST_URL);
+            oidc.searchParams.set("audience",audience);
+            const response=await fetch(oidc,{headers:{Authorization:"Bearer "+process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN},signal:AbortSignal.timeout(20000)});
+            if(!response.ok)throw new Error("Failed to obtain GitHub OIDC token: "+response.status);
+            const data=await response.json();
+            if(typeof data.value!=="string")throw new Error("Missing ephemeral OIDC token");
+            const request=await fetch("https://nexo-rotina.vercel.app/api/push/dispatch",{
+              method:"POST",
+              headers:{Authorization:"Bearer "+data.value,"Content-Type":"application/json"},
+              signal:AbortSignal.timeout(55000)
+            });
+            if(!request.ok)throw new Error("NEXO dispatcher replied "+request.status);
+            const status=await request.json();
+            console.log(JSON.stringify({ok:status.ok,scanned:status.scanned,sent:status.sent,expired:status.expired,failed:status.failed,skipped:status.skipped}));
+            if(status.failed>0)process.exitCode=1;
+          })().catch(e=>{console.error(e.message);process.exitCode=1});
+          NODE

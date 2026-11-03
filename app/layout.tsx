@@ -7,6 +7,8 @@ export const metadata: Metadata = {
   title: "NEXO | Seu tempo faz sentido",
   description: "Um lugar para organizar trabalho, estudos, treinos, saúde, família, aniversários, amigos e lazer.",
   applicationName: "NEXO",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable:true,title:"NEXO",statusBarStyle:"default" },
   icons: {icon: [{url: "/icon.svg", type: "image/svg+xml"}], shortcut: "/icon.svg", apple: [{url: "/apple-icon", sizes:"180x180", type:"image/png"}]}
 };
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

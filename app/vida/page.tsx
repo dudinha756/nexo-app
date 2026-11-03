@@ -2,6 +2,7 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {ArrowLeft,ArrowRight,CalendarDays,Check,CheckCircle2,Clock,Edit3,Plus,RefreshCw,Save,Bell,BookOpen,LifeBuoy,Sparkles,X,AlertTriangle,BriefcaseBusiness,Dumbbell,GraduationCap,Cake,Utensils,Users,HeartHandshake,HeartPulse,Sun,Tag,Plane,Camera,ShoppingBag,Music,type LucideIcon} from "lucide-react";
 import {authClient} from "@/lib/auth-client";
+import PushSetup from "@/components/PushSetup";
 import {DEFAULT_CATEGORIES,type CustomCategoryRow} from "@/lib/categories";
 import {normalizeReminderSettings,type ReminderSettings} from "@/lib/reminder-policy";
 import {addDays,monday,occurs,minutes,type EventRow,type TaskRow} from "@/lib/schedule";
@@ -171,7 +172,21 @@ export default function LifePage(){
     void read();return;
    }
    localStorage.setItem("nexo:life-reminders:"+account,JSON.stringify(prefs));
-   setError("");setSuccess(prefs.enabled?"Avisos configurados para este navegador.":"Avisos desativados.");
+   if("serviceWorker" in navigator){
+    const reg=await navigator.serviceWorker.getRegistration("/");
+    const sub=await reg?.pushManager.getSubscription();
+    if(sub){
+     const r=await fetch("/api/push/subscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"preferences",endpoint:sub.endpoint,settings:prefs})});
+     if(r.ok){
+      if(prefs.enabled)localStorage.setItem("nexo:push-active:"+account,"1");
+      else localStorage.removeItem("nexo:push-active:"+account);
+     }else if(r.status!==404){
+      const message=await r.json().catch(()=>({}));
+      throw Error(message.error||"Não foi possível atualizar os avisos push.");
+     }
+    }
+   }
+   setError("");setSuccess(prefs.enabled?"Preferências atualizadas neste aparelho.":"Avisos desativados neste aparelho.");
   }catch{setError("Não foi possível salvar os avisos neste navegador.")}
  }
 
@@ -220,12 +235,12 @@ export default function LifePage(){
    </section>
    <section className={st.card}><span className={st.tag}>AO SEU JEITO</span><h2>Minhas categorias</h2><p className={st.muted}>Crie categorias próprias para viagens, projetos, voluntariado ou qualquer outra área da sua vida.</p><div className={st.categoryRow}><strong>Categorias padrão</strong><span>{DEFAULT_CATEGORIES.length}</span></div>{data.categories.map(c=><div className={st.categoryRow} key={c.id}><span style={{display:"inline-flex",alignItems:"center",gap:6}}><i className={st.dot} style={{background:c.color}}/><CategoryIcon icon={c.icon}/>{c.name}</span><button onClick={()=>startCategory(c)} className={st.textButton}>Editar</button></div>)}<button className={st.btn+" "+st.secondary} onClick={()=>startCategory()}><Plus size={14}/> Criar categoria</button>
    </section>
-   <section className={st.card}><span className={st.tag}>AVISOS COM CONTROLE</span><h2>Lembretes por categoria</h2><p className={st.muted}>Escolha quais áreas merecem avisos e com quanto tempo de antecedência. Os avisos aparecem quando o NEXO estiver aberto e o navegador permitir notificações.</p>
+   <section className={st.card}><span className={st.tag}>AVISOS COM CONTROLE</span><h2>Lembretes por categoria</h2><p className={st.muted}>Escolha quais áreas merecem avisos e com quanto tempo de antecedência. O push opcional permite receber avisos mesmo com o NEXO fechado.</p>
     <label className={st.setting}>Ativar notificações neste navegador<input type="checkbox" checked={prefs.enabled} onChange={e=>setPrefs(s=>({...s,enabled:e.target.checked}))}/></label>
     <label className={st.field}>Antecedência<select value={prefs.lead} onChange={e=>setPrefs(s=>({...s,lead:Number(e.target.value)}))}><option value={15}>15 minutos</option><option value={30}>30 minutos</option><option value={60}>60 minutos</option></select></label>
     <label className={st.field}>Máximo de avisos por dia<select value={prefs.maxDaily} onChange={e=>setPrefs(s=>({...s,maxDaily:Number(e.target.value)}))}><option value={1}>1 aviso</option><option value={3}>3 avisos</option><option value={5}>5 avisos</option><option value={10}>10 avisos</option></select></label>
     {allCats.map(c=><label className={st.setting} key={c.key}><span><i className={st.dot} style={{background:c.color,marginRight:7}}/>{c.label}</span><input type="checkbox" checked={prefs.categories.includes(c.key)} onChange={e=>setPrefs(s=>({...s,categories:e.target.checked?[...s.categories,c.key]:s.categories.filter(k=>k!==c.key)}))}/></label>)}
-    <button className={st.btn} disabled={!prefsReady||!userId} onClick={saveReminders}><Bell size={15}/> Salvar preferências</button><p className={st.helper}>Sem rastreamento de localização e sem envio de notificações quando o navegador estiver fechado. Preferências de aviso são locais deste aparelho.</p>
+    <button className={st.btn} disabled={!prefsReady||!userId} onClick={saveReminders}><Bell size={15}/> Salvar preferências</button><p className={st.helper}>Avisos opcionais por categoria e com limite diário. A entrega em segundo plano pode sofrer atrasos.</p><PushSetup userId={userId} preferences={prefs} onActivated={()=>{const next={...prefs,enabled:true};setPrefs(next);localStorage.setItem("nexo:life-reminders:"+userId,JSON.stringify(next));}}/>
    </section>
    <section className={st.card}><span className={st.tag}>FACILITE SEU DIA</span><h2>Assistente NEXO</h2><p className={st.muted}>Ditado por voz, importação de horários em PDF, Excel e CSV, e conferência antes de salvar.</p><div className={st.actions}><a className={st.btn} href="/assistente"><Sparkles size={15}/> Abrir assistente</a><button className={st.btn+" "+st.ghost} onClick={read}><RefreshCw size={15}/> Atualizar agenda</button></div></section>
   </aside></div></>}

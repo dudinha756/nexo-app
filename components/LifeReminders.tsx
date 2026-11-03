@@ -31,6 +31,7 @@ export default function LifeReminders(){
   }
   function tick(){
    if(!alive||document.visibilityState!=="visible"||!userId)return;
+   if(localStorage.getItem("nexo:push-active:"+userId)==="1")return; // Web Push handles this device; do not duplicate local alerts.
    if(!("Notification" in window)||Notification.permission!=="granted")return;
    let prefs:ReminderSettings;
    try{

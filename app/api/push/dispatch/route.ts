@@ -25,7 +25,7 @@ async function verifiedScheduler(req:NextRequest){
   return claims.repository==="dudinha756/nexo-app" &&
    claims.ref==="refs/heads/main" &&
    claims.workflow_ref===workflow &&
-   (claims.event_name==="schedule"||claims.event_name==="workflow_dispatch");
+   (claims.event_name==="schedule"||claims.event_name==="workflow_dispatch"||claims.event_name==="push");
  }catch{return false}
 }
 export async function POST(req:NextRequest){

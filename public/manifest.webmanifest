@@ -1,0 +1,27 @@
+{
+  "id": "/nexo",
+  "name": "NEXO — Sua vida em sintonia",
+  "short_name": "NEXO",
+  "description": "Organize seus compromissos e receba lembretes de todas as áreas da sua vida.",
+  "start_url": "/vida",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f9f3fb",
+  "theme_color": "#8a78af",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-icon",
+      "type": "image/png",
+      "sizes": "180x180",
+      "purpose": "any"
+    }
+  ]
+}

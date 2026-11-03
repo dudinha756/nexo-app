@@ -1,5 +1,7 @@
 name: NEXO — Push com o site fechado
 on:
+  push:
+    branches: [main]
   schedule:
     # GitHub Actions may delay or skip scheduled jobs during heavy load.
     - cron: "*/5 * * * *"

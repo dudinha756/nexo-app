@@ -134,7 +134,20 @@ export default function Home() {
   const removeItem=async(action:string,id:string)=>{if(!window.confirm("Deseja excluir este item?"))return;await run(action,{id});};
   const generateSuggestions=async(id:string)=>{setPlannerTask(id);setSlots([]);setRemaining(null);setPlanning(true);setAlert("");try{const r=await fetch("/api/suggest",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({taskId:id,today:localToday(),time:hourNow()})});const j=await r.json();if(!r.ok)throw Error(j.error||"Não foi possível planejar.");setSlots(j.slots);setRemaining(j.remainingMinutes);}catch(e){setAlert(e instanceof Error?e.message:"Erro ao planejar.");}finally{setPlanning(false);}};
   const bookSlot=async(slot:Slot)=>{const ok=await run("scheduleTask",{taskId:plannerTask,day:slot.day,startTime:slot.start_time,endTime:slot.end_time});if(ok)await generateSuggestions(plannerTask);};
-  async function logout(){await authClient.signOut();setUser(null);setData(empty);setAuthVersion(v=>v+1);}
+  async function logout(){
+   try{
+    if("serviceWorker" in navigator){
+     const reg=await navigator.serviceWorker.getRegistration("/");
+     const sub=await reg?.pushManager.getSubscription();
+     if(sub){
+      const res=await fetch("/api/push/subscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"unsubscribe",endpoint:sub.endpoint})});
+      if(res.ok)await sub.unsubscribe();
+     }
+    }
+    if(user?.id)localStorage.removeItem("nexo:push-active:"+user.id);
+   }catch{}
+   await authClient.signOut();setUser(null);setData(empty);setAuthVersion(v=>v+1);
+  }
   if(!authReady)return <div className="splash"><NexoMark/><span>nexo.</span><p>Preparando seu espaço...</p></div>;
   if(!user)return <AuthScreen onSuccess={()=>setAuthVersion(v=>v+1)}/>;
 

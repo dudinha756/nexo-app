@@ -1,6 +1,6 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
-import {pushForEvent,pushForBriefing,localClock,validPushZone,validatePushSettings} from "../lib/push-policy.ts";
+import {pushForEvent,pushForBriefing,pushForTask,localClock,validPushZone,validatePushSettings} from "../lib/push-policy.ts";
 const pref={enabled:true,lead:30,maxDaily:5,categories:["work","birthday"]};
 const event={id:"e1",day:"2026-11-03",start_time:"19:00",end_time:"20:00",title:"Reunião",category:"work",repeat_weekly:false,repeat_yearly:false,all_day:false,task_id:null};
 test("usa horário local de Fortaleza e envio 30 minutos antes",()=>{
@@ -32,4 +32,13 @@ test("valida preferências e timezone",()=>{
  assert.equal(validPushZone("invalid/zone"),false);
  assert.equal(validatePushSettings({...pref,lead:12}),null);
  assert.equal(validatePushSettings(pref)?.maxDaily,5);
+});
+
+test("avisos de tarefas consideram prazos, categorias e conclusão",()=>{
+ const task={id:"t1",title:"Entregar relatório",due_date:"2026-11-03",status:"todo",category:"work"};
+ const now=new Date("2026-11-03T11:45:00Z");
+ assert.equal(pushForTask(task,pref,"America/Fortaleza",now)?.reminderKey,"task:t1:2026-11-03");
+ assert.equal(pushForTask({...task,status:"done"},pref,"America/Fortaleza",now),null);
+ assert.equal(pushForTask({...task,category:"health"},pref,"America/Fortaleza",now),null);
+ assert.equal(pushForTask(task,pref,"America/Fortaleza",new Date("2026-11-03T10:00:00Z")),null);
 });

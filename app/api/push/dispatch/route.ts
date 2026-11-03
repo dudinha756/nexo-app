@@ -57,7 +57,9 @@ export async function POST(req:NextRequest){
   const client=pushClient();
   let scanned=0,sent=0,expired=0,failed=0,skipped=0;
   const seen=new Set<string>();
+  const removed=new Set<string>();
   async function deliver(subscription:Subscription,reminder:PushCandidate) {
+   if(removed.has(subscription.id))return;
    const settings=validatePushSettings(subscription.settings);
    if(!settings?.enabled)return;
    const unique=subscription.id+":"+reminder.reminderKey;
@@ -77,6 +79,7 @@ export async function POST(req:NextRequest){
    }catch(err){
     const status=(err as {statusCode?:number}).statusCode||0;
     if(status===404||status===410){
+     removed.add(subscription.id);
      await sql`DELETE FROM nexo_push_subscriptions WHERE id=${subscription.id}`;
      expired++;
     }else{

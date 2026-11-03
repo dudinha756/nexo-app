@@ -2,7 +2,7 @@ import {NextRequest,NextResponse} from "next/server";
 import {createRemoteJWKSet,jwtVerify} from "jose";
 import {sql} from "@/lib/database";
 import {pushClient,asSubscription} from "@/lib/push-server";
-import {pushForEvent,pushForBriefing,validatePushSettings,validPushZone,type PushCandidate} from "@/lib/push-policy";
+import {pushForEvent,pushForBriefing,pushForTask,validatePushSettings,validPushZone,type PushCandidate,type PushTask} from "@/lib/push-policy";
 import type {EventRow} from "@/lib/schedule";
 
 export const runtime="nodejs";
@@ -14,6 +14,7 @@ const workflow="dudinha756/nexo-app/.github/workflows/push-reminders.yml@refs/he
 const keys=createRemoteJWKSet(new URL(issuer+"/.well-known/jwks"));
 type Subscription={id:string;user_id:string;endpoint:string;p256dh:string;auth:string;timezone:string;settings:unknown};
 type EventResult=Subscription & {event_id:string;title:string;day:string;start_time:string;end_time:string;category:string;custom_category_id:string|null;repeat_weekly:boolean;repeat_yearly:boolean;all_day:boolean;task_id:string|null};
+type TaskResult=Subscription & {task_id:string;title:string;due_date:string;status:string;category:string;custom_category_id:string|null};
 type BriefingResult=Subscription & {briefing_time:string;briefing_timezone:string;briefing_enabled:boolean;last_acknowledged_date:string|null};
 const forbidden=()=>NextResponse.json({error:"Acesso não autorizado."},{status:401,headers:{"Cache-Control":"no-store"}});
 async function verifiedScheduler(req:NextRequest){
@@ -48,6 +49,15 @@ export async function POST(req:NextRequest){
     FROM nexo_push_subscriptions s
     JOIN nexo_briefing_preferences b ON b.user_id=s.user_id
     WHERE s.enabled=true AND b.enabled=true ORDER BY s.id LIMIT 500`;
+  const rawTasks=await sql`SELECT s.id,s.user_id,s.endpoint,s.p256dh,s.auth,s.timezone,s.settings,
+    t.id AS task_id,t.title,t.due_date::text,t.status,
+    COALESCE(t.category,CASE WHEN t.subject_id IS NOT NULL THEN 'study' ELSE 'personal' END) AS category,
+    t.custom_category_id
+    FROM nexo_push_subscriptions s JOIN nexo_tasks t ON t.user_id=s.user_id
+    WHERE s.enabled=true AND t.status='todo'
+      AND t.due_date BETWEEN (CURRENT_DATE - 1) AND (CURRENT_DATE + 2)
+    ORDER BY CASE t.priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END,
+      t.due_date,t.id LIMIT 1200`;
   const logs=await sql`SELECT subscription_id,local_day::text AS day,count(*)::int AS n
     FROM nexo_push_deliveries
     WHERE sent_at IS NOT NULL AND local_day BETWEEN CURRENT_DATE - 2 AND CURRENT_DATE + 2
@@ -98,6 +108,15 @@ export async function POST(req:NextRequest){
    const event:EventRow={id:subscription.event_id,title:subscription.title,day:subscription.day,start_time:subscription.start_time,end_time:subscription.end_time,category:subscription.category,custom_category_id:subscription.custom_category_id,repeat_weekly:subscription.repeat_weekly,repeat_yearly:subscription.repeat_yearly,all_day:subscription.all_day,task_id:subscription.task_id};
    const candidate=pushForEvent(event,preferences,subscription.timezone,at);
    if(candidate)await deliver(subscription,candidate);
+  }
+  for(const row of rawTasks){
+   scanned++;
+   const sub=row as TaskResult;
+   const preferences=validatePushSettings(sub.settings);
+   if(!preferences)continue;
+   const t:PushTask={id:sub.task_id,title:sub.title,due_date:sub.due_date,status:sub.status,category:sub.category,custom_category_id:sub.custom_category_id};
+   const reminder=pushForTask(t,preferences,sub.timezone,at);
+   if(reminder)await deliver(sub,reminder);
   }
   for(const row of rawBriefings){
    scanned++;
